@@ -1,0 +1,21 @@
+level: debug
+name: default
+handlers:
+  - type: FileHandler
+    levels:
+      - info
+    file: log/info.log
+    rollover:
+      rollover_interval: 1d
+      rollover_size: 10G
+      backup_count: 15
+      backup_time: 7d
+    sync:
+      sync_write: false
+      flush_interval: 100
+      queue_size: 10000
+    message:
+      format: short
+      fields_format: JSON
+      max_bytes: 8192
+      meta_option: All
