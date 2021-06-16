@@ -20,6 +20,6 @@ func NewShortFormatter() *ShortFormatter {
 }
 
 func (s ShortFormatter) Format(t time.Time, level Level, msg string) string {
-	st := fmt.Sprintf(t.Format("2006-01-02 15:04:05.0000"))
+	st := fmt.Sprintf(t.Format("2006-01-02 15:04:05.000"))
 	return fmt.Sprintf(s.format, st, level, msg)
 }
