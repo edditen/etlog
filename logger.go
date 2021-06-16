@@ -11,6 +11,7 @@ func init() {
 type Logger interface {
 	Debug(msg string)
 	Info(msg string)
+	Data(msg string)
 	Warn(msg string)
 	Error(msg string)
 	Fatal(msg string)
@@ -28,6 +29,10 @@ func (sl *StdLogger) Debug(msg string) {
 }
 
 func (sl *StdLogger) Info(msg string) {
+	stdlog.Println(msg)
+}
+
+func (sl *StdLogger) Data(msg string) {
 	stdlog.Println(msg)
 }
 

@@ -116,6 +116,29 @@ func TestStdLogger_Info(t *testing.T) {
 	}
 }
 
+func TestStdLogger_Data(t *testing.T) {
+	type args struct {
+		msg string
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "when data then console message",
+			args: args{
+				msg: "hello",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sl := NewStdLogger()
+			sl.Data(tt.args.msg)
+		})
+	}
+}
+
 func TestStdLogger_Warn(t *testing.T) {
 	type args struct {
 		msg string
