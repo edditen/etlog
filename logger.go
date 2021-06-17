@@ -5,6 +5,7 @@ import (
 	"github.com/EdgarTeng/etlog/config"
 	"github.com/EdgarTeng/etlog/core"
 	"github.com/EdgarTeng/etlog/handler"
+	"log"
 	"time"
 )
 
@@ -24,6 +25,7 @@ type Logger interface {
 }
 
 type LoggerInternal struct {
+	logLevel   core.Level
 	conf       *config.Config
 	handlers   []handler.Handler
 	sourceFlag int
@@ -52,13 +54,15 @@ func NewDefaultLogger(configPath string) (*DefaultLogger, error) {
 func NewLoggerInternal(conf *config.Config) *LoggerInternal {
 	return &LoggerInternal{
 		conf:       conf,
+		logLevel:   core.DEBUG,
 		handlers:   make([]handler.Handler, 0),
 		sourceFlag: 5,
 	}
 }
 
 func (li *LoggerInternal) Init() error {
-
+	li.logLevel = core.NewLevel(li.conf.LogConf.Level)
+	log.Println("[Init] log level:", li.logLevel)
 	for _, handlerConf := range li.conf.LogConf.Handlers {
 		handler := handler.HandlerFactory(&handlerConf)
 		if err := handler.Init(); err != nil {
@@ -84,6 +88,9 @@ func (li *LoggerInternal) Finalize(level core.Level, msg string) (meta *core.Log
 }
 
 func (li *LoggerInternal) Log(level core.Level, msg string) *LoggerInternal {
+	if level < li.logLevel {
+		return li
+	}
 	meta := li.Finalize(level, msg)
 	for _, handler := range li.handlers {
 		handler.Handle(meta)

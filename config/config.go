@@ -21,7 +21,7 @@ func NewConfig(configPath string) *Config {
 }
 
 func (c *Config) Init() error {
-	stdlog.Println("[Init] init log config")
+	stdlog.Println("[Init] init log config, log config:", c.configPath)
 	yamlFile, err := ioutil.ReadFile(c.configPath)
 	if err != nil {
 		stdlog.Printf("[Init] init log config read config file error: %+v\n", err)
