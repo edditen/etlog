@@ -1,14 +1,13 @@
-package example
+package config
 
 import (
 	"encoding/json"
-	"github.com/EdgarTeng/etlog"
 	stdlog "log"
 	"testing"
 )
 
 func TestConfig(t *testing.T) {
-	conf := etlog.NewConfig("log.yaml")
+	conf := NewConfig("../example/log.yaml")
 	if err := conf.Init(); err != nil {
 		stdlog.Fatalf("%+v", err)
 	}

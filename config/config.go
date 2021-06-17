@@ -1,4 +1,4 @@
-package etlog
+package config
 
 import (
 	"fmt"
@@ -43,7 +43,9 @@ type LogConfig struct {
 }
 
 func NewLogConfig() *LogConfig {
-	return &LogConfig{}
+	return &LogConfig{
+		Handlers: make([]HandlerConfig, 0),
+	}
 }
 
 type HandlerConfig struct {
@@ -55,11 +57,23 @@ type HandlerConfig struct {
 	Message  *MessageConfig  `yaml:"message"`
 }
 
+func NewHandlerConfig() *HandlerConfig {
+	return &HandlerConfig{
+		Rollover: NewRolloverConfig(),
+		Sync:     NewSyncConfig(),
+		Message:  NewMessageConfig(),
+	}
+}
+
 type RolloverConfig struct {
 	RolloverInterval string `yaml:"rollover_interval"`
 	RolloverSize     string `yaml:"rollover_size"`
 	BackupCount      int    `yaml:"backup_count"`
 	BackupTime       string `yaml:"backup_time"`
+}
+
+func NewRolloverConfig() *RolloverConfig {
+	return &RolloverConfig{}
 }
 
 type SyncConfig struct {
@@ -68,9 +82,17 @@ type SyncConfig struct {
 	QueueSize     int    `yaml:"queue_size"`
 }
 
+func NewSyncConfig() *SyncConfig {
+	return &SyncConfig{}
+}
+
 type MessageConfig struct {
 	Format       string `yaml:"format"`
 	FieldsFormat string `yaml:"fields_format"`
 	MaxBytes     string `yaml:"max_bytes"`
 	MetaOption   string `yaml:"meta_option"`
+}
+
+func NewMessageConfig() *MessageConfig {
+	return &MessageConfig{}
 }

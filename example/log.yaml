@@ -1,7 +1,13 @@
 level: debug
 name: default
 handlers:
-  - type: FileHandler
+  - type: std
+    levels:
+      - info
+    message:
+      format: simple
+
+  - type: file
     levels:
       - info
     file: log/info.log
@@ -15,7 +21,9 @@ handlers:
       flush_interval: 100
       queue_size: 10000
     message:
-      format: short
+      format: full
       fields_format: JSON
       max_bytes: 8192
       meta_option: All
+
+

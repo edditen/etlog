@@ -1,4 +1,4 @@
-package etlog
+package core
 
 import "strings"
 
