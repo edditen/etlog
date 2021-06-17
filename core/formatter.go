@@ -34,7 +34,7 @@ func (f Format) String() string {
 }
 
 type Formatter interface {
-	Format(meta *LogMeta) string
+	Format(entry *LogEntry) string
 }
 
 type SimpleFormatter struct {
@@ -57,9 +57,9 @@ func NewSimpleFormatter() *SimpleFormatter {
 	}
 }
 
-func (s SimpleFormatter) Format(meta *LogMeta) string {
-	fmtTime := fmt.Sprintf(meta.Time.Format("2006-01-02 15:04:05.000000"))
-	return fmt.Sprintf(s.format, fmtTime, meta.Level, meta.Msg)
+func (s SimpleFormatter) Format(entry *LogEntry) string {
+	fmtTime := fmt.Sprintf(entry.Time.Format("2006-01-02 15:04:05.000000"))
+	return fmt.Sprintf(s.format, fmtTime, entry.Level, entry.Msg)
 }
 
 type FullFormatter struct {
@@ -72,10 +72,10 @@ func NewFullFormatter() *FullFormatter {
 	}
 }
 
-func (s FullFormatter) Format(meta *LogMeta) string {
-	fmtTime := fmt.Sprintf(meta.Time.Format("2006-01-02 15:04:05.000000"))
-	if meta.SrcValid {
-		return fmt.Sprintf(s.format, fmtTime, meta.Level, meta.Line, meta.FuncName, meta.Msg)
+func (s FullFormatter) Format(entry *LogEntry) string {
+	fmtTime := fmt.Sprintf(entry.Time.Format("2006-01-02 15:04:05.000000"))
+	if entry.SrcValid {
+		return fmt.Sprintf(s.format, fmtTime, entry.Level, entry.Line, entry.FuncName, entry.Msg)
 	}
-	return fmt.Sprintf(s.format, fmtTime, meta.Level, "-", "-", meta.Msg)
+	return fmt.Sprintf(s.format, fmtTime, entry.Level, "-", "-", entry.Msg)
 }

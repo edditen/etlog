@@ -3,9 +3,17 @@ name: default
 handlers:
   - type: std
     levels:
+      - debug
       - info
     message:
       format: simple
+
+  - type: file
+    levels:
+      - debug
+    file: log/debug.log
+    message:
+      format: full
 
   - type: file
     levels:
@@ -26,4 +34,24 @@ handlers:
       max_bytes: 8192
       meta_option: All
 
+  - type: file
+    levels:
+      - warn
+    file: log/warn.log
+    message:
+      format: full
+
+  - type: file
+    levels:
+      - error
+    file: log/error.log
+    message:
+      format: full
+
+  - type: file
+    levels:
+      - fatal
+    file: log/fatal.log
+    message:
+      format: full
 

@@ -36,39 +36,53 @@ func (h HandlerType) String() string {
 
 type Handler interface {
 	Init() error
-	Handle(meta *core.LogMeta) error
+	Handle(entry *core.LogEntry) error
 	Shutdown()
 }
 
 type BaseHandler struct {
 	handlerConfig *config.HandlerConfig
 	formatter     core.Formatter
+	levels        map[core.Level]interface{}
 }
 
 func NewBaseHandler(conf *config.HandlerConfig) *BaseHandler {
-	return &BaseHandler{handlerConfig: conf}
+	return &BaseHandler{
+		handlerConfig: conf,
+		levels:        make(map[core.Level]interface{}, 0),
+	}
 }
 
 func (bh *BaseHandler) Init() error {
 	bh.DefaultSetting()
 	format := core.NewFormat(bh.handlerConfig.Message.Format)
 	bh.formatter = core.FormatterFactory(format)
+	for _, level := range bh.handlerConfig.Levels {
+		bh.levels[core.NewLevel(level)] = true
+	}
 	return nil
 }
 
-func (bh *BaseHandler) Handle(meta *core.LogMeta) error {
+func (bh *BaseHandler) Handle(entry *core.LogEntry) error {
 	return nil
 }
 
 func (bh *BaseHandler) Shutdown() {
 }
 
+func (bh *BaseHandler) Contains(level core.Level) bool {
+	if _, ok := bh.levels[level]; ok {
+		return true
+	}
+	return false
+}
+
 func (bh *BaseHandler) DefaultSetting() {
 	if bh.handlerConfig == nil {
 		bh.handlerConfig = config.NewHandlerConfig()
 	}
-	if bh.handlerConfig.File == "" {
-		bh.handlerConfig.File = defaultLogFile
+	if bh.handlerConfig.Levels == nil {
+		bh.handlerConfig.Levels = make([]string, 0)
 	}
 	if bh.handlerConfig.Message == nil {
 		bh.handlerConfig.Message = config.NewMessageConfig()

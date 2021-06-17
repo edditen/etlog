@@ -8,10 +8,6 @@ import (
 	"os"
 )
 
-const (
-	defaultLogFile = "log/etlog.log"
-)
-
 type FileHandler struct {
 	*BaseHandler
 	file *os.File
@@ -45,8 +41,11 @@ func (fh *FileHandler) Init() (err error) {
 	return nil
 }
 
-func (fh *FileHandler) Handle(meta *core.LogMeta) error {
-	msg := fh.BaseHandler.formatter.Format(meta)
+func (fh *FileHandler) Handle(entry *core.LogEntry) error {
+	if !fh.BaseHandler.Contains(entry.Level) {
+		return nil
+	}
+	msg := fh.BaseHandler.formatter.Format(entry)
 	if _, err := fh.file.WriteString(msg); err != nil {
 		return errors.Wrap(err, "write file error")
 	}

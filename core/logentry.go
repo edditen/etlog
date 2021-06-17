@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-type LogMeta struct {
+type LogEntry struct {
 	Time     time.Time `json:"time"`
 	Level    Level     `json:"level"`
 	Line     string    `json:"line"`
@@ -13,8 +13,6 @@ type LogMeta struct {
 	SrcValid bool      `json:"-"`
 }
 
-func NewLogMeta() *LogMeta {
-	return &LogMeta{
-		SrcValid: false,
-	}
+func NewLogMeta() *LogEntry {
+	return &LogEntry{}
 }

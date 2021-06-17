@@ -16,6 +16,7 @@ func SetDefaultLog(log Logger) {
 }
 
 type Logger interface {
+	WithField(field string, v interface{}) Logger
 	Debug(msg string)
 	Info(msg string)
 	Data(msg string)
@@ -73,29 +74,36 @@ func (li *LoggerInternal) Init() error {
 	return nil
 }
 
-func (li *LoggerInternal) Finalize(level core.Level, msg string) (meta *core.LogMeta) {
-	meta = core.NewLogMeta()
-	meta.Time = time.Now()
-	meta.Level = level
-	meta.Msg = msg
+func (li *LoggerInternal) finalize(level core.Level, msg string) (entry *core.LogEntry) {
+	entry = core.NewLogMeta()
+	entry.Time = time.Now()
+	entry.Level = level
+	entry.Msg = msg
 	if line, funcName, ok := utils.ShortSourceLoc(li.sourceFlag); ok {
-		meta.SrcValid = true
-		meta.Line = line
-		meta.FuncName = funcName
+		entry.SrcValid = true
+		entry.Line = line
+		entry.FuncName = funcName
 	}
 
-	return meta
+	return entry
 }
 
-func (li *LoggerInternal) Log(level core.Level, msg string) *LoggerInternal {
-	if level < li.logLevel {
-		return li
+func (li *LoggerInternal) Log(level core.Level, msg string) {
+	if !li.Enable(level) {
+		return
 	}
-	meta := li.Finalize(level, msg)
+	entry := li.finalize(level, msg)
 	for _, handler := range li.handlers {
-		handler.Handle(meta)
+		handler.Handle(entry)
 	}
-	return li
+	return
+}
+
+func (li *LoggerInternal) Enable(level core.Level) bool {
+	if level < li.logLevel {
+		return false
+	}
+	return true
 }
 
 func (dl *DefaultLogger) Debug(msg string) {
@@ -120,4 +128,8 @@ func (dl *DefaultLogger) Error(msg string) {
 
 func (dl *DefaultLogger) Fatal(msg string) {
 	dl.internal.Log(core.FATAL, msg)
+}
+
+func (dl *DefaultLogger) WithField(field string, v interface{}) Logger {
+	return dl
 }
