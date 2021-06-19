@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -28,11 +29,9 @@ func (f Fields) String() string {
 		return ""
 	}
 	builder := &strings.Builder{}
-	for k, v := range f {
-		builder.WriteString(k)
-		builder.WriteString(":")
-		builder.WriteString(fmt.Sprintf("%v", v))
-		builder.WriteString(", ")
+	if err := json.NewEncoder(builder).Encode(f); err != nil {
+		fmt.Println(err.Error())
+		return ""
 	}
 	return builder.String()
 }
