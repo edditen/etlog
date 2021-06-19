@@ -57,9 +57,9 @@ func NewSimpleFormatter() *SimpleFormatter {
 	}
 }
 
-func (s SimpleFormatter) Format(entry *LogEntry) string {
+func (sf SimpleFormatter) Format(entry *LogEntry) string {
 	fmtTime := fmt.Sprintf(entry.Time.Format("2006-01-02 15:04:05.000000"))
-	return fmt.Sprintf(s.format, fmtTime, entry.Level, entry.Msg)
+	return fmt.Sprintf(sf.format, fmtTime, entry.Level, entry.Msg)
 }
 
 type FullFormatter struct {
@@ -68,14 +68,49 @@ type FullFormatter struct {
 
 func NewFullFormatter() *FullFormatter {
 	return &FullFormatter{
-		format: "%s|%s|%s|%s|%s\n",
+		// format: "time|level|line|func|message|error|fields"
+		format: "%s|%s|%s|%s|%s|%s|%s\n",
 	}
 }
 
-func (s FullFormatter) Format(entry *LogEntry) string {
+func (ff FullFormatter) Format(entry *LogEntry) string {
 	fmtTime := fmt.Sprintf(entry.Time.Format("2006-01-02 15:04:05.000000"))
+	builder := &strings.Builder{}
+	// timestamp
+	builder.WriteString(fmtTime)
+	builder.WriteString("|")
+	// level
+	builder.WriteString(fmt.Sprintf("%s", entry.Level))
+	builder.WriteString("|")
+
+	// line & func
 	if entry.SrcValid {
-		return fmt.Sprintf(s.format, fmtTime, entry.Level, entry.Line, entry.FuncName, entry.Msg)
+		builder.WriteString(entry.Line)
+		builder.WriteString("|")
+		builder.WriteString(entry.FuncName)
+	} else {
+		builder.WriteString("-|-")
 	}
-	return fmt.Sprintf(s.format, fmtTime, entry.Level, "-", "-", entry.Msg)
+	builder.WriteString("|")
+
+	// msg
+	builder.WriteString(entry.Msg)
+	builder.WriteString("|")
+
+	// error
+	if entry.Err != nil {
+		builder.WriteString(fmt.Sprintf("%s", entry.Err))
+	} else {
+		builder.WriteString("-")
+	}
+	builder.WriteString("|")
+
+	// fields
+	if entry.Fields != nil && len(entry.Fields) > 0 {
+		builder.WriteString(fmt.Sprintf("%s", entry.Fields))
+
+	}
+	builder.WriteString("\n")
+
+	return builder.String()
 }
