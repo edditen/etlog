@@ -5,6 +5,7 @@ handlers:
     levels:
       - debug
       - info
+      - error
     message:
       format: simple
 
