@@ -1,21 +1,41 @@
 package handler
 
 import (
-	"github.com/EdgarTeng/etlog/common/utils"
 	"github.com/EdgarTeng/etlog/config"
 	"github.com/EdgarTeng/etlog/core"
 	"github.com/pkg/errors"
+	"io/fs"
 	"os"
+	"path"
+)
+
+const (
+	fileFlag             = os.O_APPEND | os.O_CREATE | os.O_WRONLY
+	fileMode fs.FileMode = 0644
 )
 
 type FileHandler struct {
 	*BaseHandler
-	file *os.File
+	fileWriter *os.File
+	filePath   string
+	fileDir    string
+	fileExt    string
+	fileName   string
+	filePrefix string
 }
 
 func NewFileHandler(conf *config.HandlerConfig) *FileHandler {
+	filePath := conf.File
+	fileDir := path.Dir(filePath)
+	fileName := path.Base(filePath)
+	fileExt := path.Ext(filePath)
 	return &FileHandler{
 		BaseHandler: NewBaseHandler(conf),
+		filePath:    filePath,
+		fileDir:     fileDir,
+		fileName:    fileName,
+		fileExt:     fileExt,
+		filePrefix:  fileName[:len(fileName)-len(fileExt)],
 	}
 }
 
@@ -24,17 +44,11 @@ func (fh *FileHandler) Init() (err error) {
 		return err
 	}
 
-	path := utils.FirstSubstring(fh.BaseHandler.handlerConfig.File, "/")
-
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if err := os.Mkdir(path, os.ModePerm); err != nil {
-			return err
-		}
-
+	if err = os.MkdirAll(fh.fileDir, os.ModePerm); err != nil {
+		return errors.Wrap(err, "create dir error")
 	}
 
-	fh.file, err = os.OpenFile(fh.BaseHandler.handlerConfig.File,
-		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	fh.fileWriter, err = os.OpenFile(fh.filePath, fileFlag, fileMode)
 	if err != nil {
 		return errors.Wrap(err, "open file error")
 	}
@@ -46,12 +60,12 @@ func (fh *FileHandler) Handle(entry *core.LogEntry) error {
 		return nil
 	}
 	msg := fh.BaseHandler.formatter.Format(entry)
-	if _, err := fh.file.WriteString(msg); err != nil {
+	if _, err := fh.fileWriter.WriteString(msg); err != nil {
 		return errors.Wrap(err, "write file error")
 	}
 	return nil
 }
 
 func (fh *FileHandler) Shutdown() {
-	_ = fh.file.Close()
+	_ = fh.fileWriter.Close()
 }
