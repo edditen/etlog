@@ -2,13 +2,17 @@ package main
 
 import (
 	"fmt"
-	"github.com/EdgarTeng/etlog"
 	"log"
+	"sync"
 	"time"
+
+	"github.com/EdgarTeng/etlog"
 )
 
 func main() {
-	RunAll()
+	RunRotate()
+	log.Println("done")
+
 }
 
 func RunAll() {
@@ -21,10 +25,10 @@ func RunAll() {
 	etlog.Log.Debug("hello")
 	etlog.Log.Info("hello")
 	etlog.Log.Info("world")
-	etlog.Log.Data("hello")
+	// etlog.Log.Data("hello")
 	etlog.Log.Warn("world")
 	etlog.Log.Error("world")
-	etlog.Log.Fatal("world")
+	// etlog.Log.Fatal("world")
 	etlog.Log.WithError(fmt.Errorf("oops")).
 		WithField("key", "word").
 		WithField("now", time.Now()).
@@ -47,16 +51,25 @@ func RunRotate() {
 	etlog.SetDefaultLog(logger)
 
 	endTime := time.Now().Add(30 * time.Second)
-	for {
-		etlog.Log.
-			WithField("key", "word").
-			WithField("now", time.Now()).
-			Info("this is message")
+	wg := new(sync.WaitGroup)
+	for i := 0; i < 10; i++ {
+		index := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				etlog.Log.
+					WithField("key", "word").
+					WithField("index", index).
+					WithField("now", time.Now()).
+					Info("this is message")
 
-		if time.Now().After(endTime) {
-			break
-		}
+				if time.Now().After(endTime) {
+					break
+				}
+			}
+		}()
 	}
-	log.Println("done")
+	wg.Wait()
 
 }

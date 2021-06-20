@@ -2,16 +2,18 @@ package handler
 
 import (
 	"fmt"
-	"github.com/EdgarTeng/etlog/common/utils"
-	"github.com/EdgarTeng/etlog/config"
-	"github.com/EdgarTeng/etlog/core"
-	"github.com/pkg/errors"
 	"io/fs"
 	"math"
 	"os"
 	"path"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/EdgarTeng/etlog/common/utils"
+	"github.com/EdgarTeng/etlog/config"
+	"github.com/EdgarTeng/etlog/core"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -38,12 +40,14 @@ type FileHandler struct {
 	writenSize     int64
 	rotateAt       time.Time
 	rotateLock     *sync.RWMutex
+	flushLock      *sync.Mutex
 }
 
 func NewFileHandler(conf *config.HandlerConfig) *FileHandler {
 	return &FileHandler{
 		BaseHandler: NewBaseHandler(conf),
 		rotateLock:  new(sync.RWMutex),
+		flushLock:   new(sync.Mutex),
 	}
 }
 
@@ -72,16 +76,6 @@ func (fh *FileHandler) Init() error {
 		return err
 	}
 
-	if err := fh.settingFileWriter(); err != nil {
-		return err
-	}
-
-	if err := fh.settingWritenSize(); err != nil {
-		return err
-	}
-
-	fh.rotateAt = fh.nextTimeRotate(fh.rotateInterval)
-
 	return nil
 }
 
@@ -90,8 +84,16 @@ func (fh *FileHandler) Handle(entry *core.LogEntry) error {
 		return nil
 	}
 
+	if fh.shouldCreateFile() {
+		if err := fh.createFile(); err != nil {
+			return err
+		}
+	}
+
 	if fh.shouldRotate() {
-		fh.Rotate()
+		if err := fh.Rotate(); err != nil {
+			return err
+		}
 	}
 
 	msg := fh.BaseHandler.formatter.Format(entry)
@@ -101,36 +103,73 @@ func (fh *FileHandler) Handle(entry *core.LogEntry) error {
 	return nil
 }
 
-func (fh *FileHandler) Flush(msg string) error {
-	fh.rotateLock.RLock()
-	defer fh.rotateLock.RUnlock()
-
-	if _, err := fh.fileWriter.WriteString(msg); err != nil {
-		return errors.Wrap(err, "write file error")
-	}
-	fh.writenSize += int64(len([]byte(msg)))
-	return nil
+func (fh *FileHandler) shouldCreateFile() bool {
+	return fh.fileWriter == nil
 }
 
-func (fh *FileHandler) Rotate() error {
+func (fh *FileHandler) createFile() error {
 	fh.rotateLock.Lock()
 	defer fh.rotateLock.Unlock()
 
-	backupName := fh.backupFileName()
-	_ = fh.fileWriter.Close()
-
-	if err := os.Rename(fh.filePath, backupName); err != nil {
-		return errors.Wrap(err, "rotate file error")
+	// double check
+	if !fh.shouldCreateFile() {
+		return nil
 	}
+
 	if err := fh.settingFileWriter(); err != nil {
 		return err
 	}
+
 	if err := fh.settingWritenSize(); err != nil {
 		return err
 	}
 
 	fh.rotateAt = fh.nextTimeRotate(fh.rotateInterval)
+	return nil
+}
 
+func (fh *FileHandler) Flush(msg string) error {
+	fh.rotateLock.RLock()
+	defer fh.rotateLock.RUnlock()
+
+	fh.flushLock.Lock()
+	defer fh.flushLock.Unlock()
+
+	if _, err := fh.fileWriter.WriteString(msg); err != nil {
+		return errors.Wrap(err, "write file error")
+	}
+
+	atomic.AddInt64(&fh.writenSize, int64(len([]byte(msg))))
+	return nil
+}
+
+func (fh *FileHandler) Rotate() error {
+	if err := fh.rotateIt(); err != nil {
+		return nil
+	}
+
+	if fh.shouldCreateFile() {
+		return fh.createFile()
+	}
+
+	return nil
+}
+
+func (fh *FileHandler) rotateIt() error {
+	fh.rotateLock.Lock()
+	defer fh.rotateLock.Unlock()
+
+	//double check
+	if !fh.shouldRotate() {
+		return nil
+	}
+
+	fh.closeFileWriter()
+
+	backupName := fh.backupFileName()
+	if err := os.Rename(fh.filePath, backupName); err != nil {
+		return errors.Wrap(err, "rotate file error")
+	}
 	return nil
 }
 
@@ -151,8 +190,9 @@ func (fh *FileHandler) backupFileName() string {
 	return path.Join(fh.fileDir, filename)
 }
 
-func (fh *FileHandler) Shutdown() {
+func (fh *FileHandler) closeFileWriter() {
 	_ = fh.fileWriter.Close()
+	fh.fileWriter = nil
 }
 
 func (fh *FileHandler) settingFileInfo() (err error) {
