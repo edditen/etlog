@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	fileFlag             = os.O_APPEND | os.O_CREATE | os.O_WRONLY
-	fileMode fs.FileMode = 0644
+	fileFlag                     = os.O_APPEND | os.O_CREATE | os.O_WRONLY
+	fileMode         fs.FileMode = 0644
+	backupTimeFormat             = "2006-01-02.150405"
 )
 
 type FileHandler struct {
@@ -21,21 +22,17 @@ type FileHandler struct {
 	fileDir    string
 	fileExt    string
 	fileName   string
-	filePrefix string
+	rotateSize int64
+	size       int64
 }
 
 func NewFileHandler(conf *config.HandlerConfig) *FileHandler {
-	filePath := conf.File
-	fileDir := path.Dir(filePath)
-	fileName := path.Base(filePath)
-	fileExt := path.Ext(filePath)
 	return &FileHandler{
 		BaseHandler: NewBaseHandler(conf),
-		filePath:    filePath,
-		fileDir:     fileDir,
-		fileName:    fileName,
-		fileExt:     fileExt,
-		filePrefix:  fileName[:len(fileName)-len(fileExt)],
+		filePath:    conf.File,
+		fileDir:     path.Dir(conf.File),
+		fileName:    path.Base(conf.File),
+		fileExt:     path.Ext(conf.File),
 	}
 }
 
