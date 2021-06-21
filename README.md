@@ -1,1 +1,3 @@
 # etlog
+
+Log in golang
