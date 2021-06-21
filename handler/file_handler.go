@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"github.com/EdgarTeng/etlog/common/bufferpool"
 	"io/fs"
 	"math"
 	"os"
@@ -17,13 +18,15 @@ import (
 )
 
 const (
-	fileFlag                        = os.O_APPEND | os.O_CREATE | os.O_WRONLY
-	fileMode            fs.FileMode = 0644
-	backupTimeFormat                = "2006-01-02.150405"
-	defaultLogSize                  = "10G"
-	defaultRolloverTime             = "1d"
-	defaultBackupTime               = "365d"
-	defaultBackupCount              = math.MaxInt32
+	fileFlag                         = os.O_APPEND | os.O_CREATE | os.O_WRONLY
+	fileMode             fs.FileMode = 0644
+	backupTimeFormat                 = "2006-01-02.150405"
+	defaultLogSize                   = "10G"
+	defaultRolloverTime              = "1d"
+	defaultBackupTime                = "365d"
+	defaultBackupCount               = math.MaxInt32
+	defaultQueueSize                 = 8192
+	defaultFlushInterval             = 100
 )
 
 type FileHandler struct {
@@ -41,6 +44,13 @@ type FileHandler struct {
 	rotateAt       time.Time
 	rotateLock     *sync.RWMutex
 	flushLock      *sync.Mutex
+	asyncWrite     bool
+	queueSize      int
+	flushInterval  int
+	entryChan      chan *core.LogEntry
+	ticker         *time.Ticker
+	asyncMutex     *sync.RWMutex
+	queueFull      chan bool
 }
 
 func NewFileHandler(conf *config.HandlerConfig) *FileHandler {
@@ -76,6 +86,14 @@ func (fh *FileHandler) Init() error {
 		return err
 	}
 
+	if err := fh.settingSync(); err != nil {
+		return err
+	}
+
+	if err := fh.settingChan(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -84,6 +102,29 @@ func (fh *FileHandler) Handle(entry *core.LogEntry) error {
 		return nil
 	}
 
+	if fh.asyncWrite {
+		select {
+		case fh.entryChan <- entry:
+		default:
+			fh.syncHandle(entry)
+			fh.notifyFull()
+		}
+		return nil
+	}
+	return fh.syncHandle(entry)
+}
+
+func (fh *FileHandler) syncHandle(entry *core.LogEntry) error {
+	buf := fh.BaseHandler.formatter.Format(entry)
+	defer buf.Free()
+
+	if err := fh.syncHandleWithBytes(buf.Bytes()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (fh *FileHandler) syncHandleWithBytes(bs []byte) error {
 	if fh.shouldCreateFile() {
 		if err := fh.createFileWithLock(); err != nil {
 			return err
@@ -96,8 +137,7 @@ func (fh *FileHandler) Handle(entry *core.LogEntry) error {
 		}
 	}
 
-	msg := fh.BaseHandler.formatter.Format(entry)
-	if err := fh.Flush(msg); err != nil {
+	if err := fh.Flush(bs); err != nil {
 		return err
 	}
 	return nil
@@ -132,24 +172,28 @@ func (fh *FileHandler) createFile() error {
 	return nil
 }
 
-func (fh *FileHandler) Flush(msg string) error {
+func (fh *FileHandler) Flush(bs []byte) error {
 	fh.rotateLock.RLock()
 	defer fh.rotateLock.RUnlock()
 
 	fh.flushLock.Lock()
 	defer fh.flushLock.Unlock()
 
-	if _, err := fh.fileWriter.WriteString(msg); err != nil {
+	if _, err := fh.fileWriter.Write(bs); err != nil {
 		return errors.Wrap(err, "write file error")
 	}
 
-	atomic.AddInt64(&fh.writenSize, int64(len([]byte(msg))))
+	atomic.AddInt64(&fh.writenSize, int64(len(bs)))
 	return nil
 }
 
 func (fh *FileHandler) Rotate() error {
 	fh.rotateLock.Lock()
 	defer fh.rotateLock.Unlock()
+
+	if !fh.shouldRotate() {
+		return nil
+	}
 
 	if err := fh.rotateIt(); err != nil {
 		return err
@@ -163,11 +207,6 @@ func (fh *FileHandler) Rotate() error {
 }
 
 func (fh *FileHandler) rotateIt() error {
-	//double check
-	if !fh.shouldRotate() {
-		return nil
-	}
-
 	fh.closeFileWriter()
 
 	backupName := fh.backupFileName()
@@ -181,7 +220,7 @@ func (fh *FileHandler) shouldRotate() bool {
 	if time.Now().After(fh.rotateAt) {
 		return true
 	}
-	if fh.writenSize >= int64(fh.rotateSize) {
+	if fh.writenSize > int64(fh.rotateSize) {
 		return true
 	}
 	return false
@@ -280,4 +319,100 @@ func (fh *FileHandler) settingWritenSize() error {
 	}
 
 	return nil
+}
+
+func (fh *FileHandler) settingSync() error {
+	fh.asyncWrite = fh.BaseHandler.handlerConfig.Sync.AsyncWrite
+
+	if fh.BaseHandler.handlerConfig.Sync.QueueSize <= 0 {
+		fh.BaseHandler.handlerConfig.Sync.QueueSize = defaultQueueSize
+	}
+	fh.queueSize = fh.BaseHandler.handlerConfig.Sync.QueueSize
+
+	if fh.BaseHandler.handlerConfig.Sync.FlushInterval <= 0 {
+		fh.BaseHandler.handlerConfig.Sync.FlushInterval = defaultFlushInterval
+	}
+	fh.flushInterval = fh.BaseHandler.handlerConfig.Sync.FlushInterval
+
+	return nil
+}
+
+func (fh *FileHandler) settingChan() error {
+	if !fh.asyncWrite {
+		return nil
+	}
+
+	fh.asyncMutex = new(sync.RWMutex)
+	fh.queueFull = make(chan bool)
+	fh.entryChan = make(chan *core.LogEntry, fh.queueSize)
+	fh.ticker = time.NewTicker(time.Duration(fh.flushInterval) * time.Millisecond)
+
+	go fh.runChan()
+
+	return nil
+}
+
+func (fh *FileHandler) notifyFull() {
+	select {
+	case fh.queueFull <- true:
+	default:
+	}
+}
+
+type LogEntries = []*core.LogEntry
+
+func (fh *FileHandler) runChan() {
+	var entries LogEntries
+	entries = make([]*core.LogEntry, 0)
+	for {
+		select {
+		case logEntry := <-fh.entryChan:
+			fh.appendLogEntry(&entries, logEntry)
+		case <-fh.ticker.C:
+			fh.popLogEntry(&entries)
+		case <-fh.queueFull:
+			fh.popLogEntry(&entries)
+		}
+	}
+}
+
+func (fh *FileHandler) appendLogEntry(entries *LogEntries, entry *core.LogEntry) {
+	fh.asyncMutex.RLock()
+	defer fh.asyncMutex.RUnlock()
+
+	*entries = append(*entries, entry)
+}
+
+func (fh *FileHandler) popLogEntry(entries *LogEntries) {
+	fh.asyncMutex.Lock()
+	defer fh.asyncMutex.Unlock()
+
+	if len(*entries) == 0 {
+		return
+	}
+
+	blockSize := 256
+	blocks := getBlocks(len(*entries), blockSize)
+	for i := 0; i < blocks; i++ {
+		buf := bufferpool.Borrow()
+
+		for j := 0; j < blockSize && i*blocks+j < len(*entries); j++ {
+			entry := (*entries)[i*blocks+j]
+			b := fh.formatter.Format(entry)
+			buf.AppendBytes(b.BytesCopy())
+			b.Free()
+		}
+
+		fh.syncHandleWithBytes(buf.Bytes())
+		buf.Free()
+	}
+
+	*entries = (*entries)[:0]
+}
+
+func getBlocks(totalSize, blockSize int) int {
+	if totalSize%blockSize == 0 {
+		return totalSize / blockSize
+	}
+	return totalSize/blockSize + 1
 }

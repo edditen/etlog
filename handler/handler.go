@@ -41,7 +41,7 @@ type Handler interface {
 }
 
 type Flusher interface {
-	Flush(msg string) error
+	Flush(bs []byte) error
 }
 
 type BaseHandler struct {
