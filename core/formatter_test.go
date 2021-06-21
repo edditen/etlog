@@ -43,7 +43,7 @@ func TestFullFormatter_Format(t *testing.T) {
 					SrcValid: false,
 				},
 			},
-			want: "2021-06-15 12:20:45.152000|INFO|-|-|hello world\n",
+			want: "2021-06-15 12:20:45.152000|INFO|-|-|hello world|-|\n",
 		},
 		{
 			name: "when src then output full",
@@ -57,7 +57,7 @@ func TestFullFormatter_Format(t *testing.T) {
 					FuncName: "TestFormatter.func1",
 				},
 			},
-			want: "2021-06-15 12:20:45.152000|INFO|hello.go:123|TestFormatter.func1|hello world\n",
+			want: "2021-06-15 12:20:45.152000|INFO|hello.go:123|TestFormatter.func1|hello world|-|\n",
 		},
 	}
 	for _, tt := range tests {

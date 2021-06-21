@@ -40,6 +40,10 @@ type Handler interface {
 	Shutdown()
 }
 
+type Flusher interface {
+	Flush(msg string) error
+}
+
 type BaseHandler struct {
 	handlerConfig *config.HandlerConfig
 	formatter     core.Formatter

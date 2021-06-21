@@ -33,5 +33,5 @@ func (f Fields) String() string {
 		fmt.Println(err.Error())
 		return ""
 	}
-	return builder.String()
+	return strings.TrimSpace(builder.String())
 }
