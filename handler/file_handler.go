@@ -85,7 +85,7 @@ func (fh *FileHandler) Handle(entry *core.LogEntry) error {
 	}
 
 	if fh.shouldCreateFile() {
-		if err := fh.createFile(); err != nil {
+		if err := fh.createFileWithLock(); err != nil {
 			return err
 		}
 	}
@@ -107,10 +107,14 @@ func (fh *FileHandler) shouldCreateFile() bool {
 	return fh.fileWriter == nil
 }
 
-func (fh *FileHandler) createFile() error {
+func (fh *FileHandler) createFileWithLock() error {
 	fh.rotateLock.Lock()
 	defer fh.rotateLock.Unlock()
 
+	return fh.createFile()
+}
+
+func (fh *FileHandler) createFile() error {
 	// double check
 	if !fh.shouldCreateFile() {
 		return nil
@@ -144,21 +148,21 @@ func (fh *FileHandler) Flush(msg string) error {
 }
 
 func (fh *FileHandler) Rotate() error {
+	fh.rotateLock.Lock()
+	defer fh.rotateLock.Unlock()
+
 	if err := fh.rotateIt(); err != nil {
-		return nil
+		return err
 	}
 
-	if fh.shouldCreateFile() {
-		return fh.createFile()
+	if err := fh.createFile(); err != nil {
+		return err
 	}
 
 	return nil
 }
 
 func (fh *FileHandler) rotateIt() error {
-	fh.rotateLock.Lock()
-	defer fh.rotateLock.Unlock()
-
 	//double check
 	if !fh.shouldRotate() {
 		return nil
