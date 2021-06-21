@@ -23,6 +23,7 @@ func (p *ChannelPool) Borrow() *Buffer {
 	var buf *Buffer
 	select {
 	case buf = <-p.pool:
+		buf.pool = p
 		buf.Reset()
 	default:
 		buf = newBuffer(p)
