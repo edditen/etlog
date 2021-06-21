@@ -1,9 +1,9 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -25,13 +25,26 @@ func NewLogMeta() *LogEntry {
 }
 
 func (f Fields) String() string {
+	return string(f.Bytes())
+}
+
+func (f Fields) Bytes() []byte {
 	if f == nil || len(f) == 0 {
-		return ""
+		return []byte{}
 	}
-	builder := &strings.Builder{}
+	builder := &bytes.Buffer{}
 	if err := json.NewEncoder(builder).Encode(f); err != nil {
 		fmt.Println(err.Error())
-		return ""
+		return []byte{}
 	}
-	return strings.TrimSpace(builder.String())
+	return trimNewline(builder.Bytes())
+}
+
+func trimNewline(bs []byte) []byte {
+	if i := len(bs) - 1; i >= 0 {
+		if bs[i] == '\n' {
+			bs = bs[:i]
+		}
+	}
+	return bs
 }

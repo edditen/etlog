@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/EdgarTeng/etlog/common/bufferpool"
 	"github.com/EdgarTeng/etlog/config"
 	"github.com/EdgarTeng/etlog/core"
 	"strings"
@@ -41,7 +42,7 @@ type Handler interface {
 }
 
 type Flusher interface {
-	Flush(msg string) error
+	Flush(buf *bufferpool.Buffer) error
 }
 
 type BaseHandler struct {

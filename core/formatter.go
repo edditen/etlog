@@ -2,10 +2,15 @@ package core
 
 import (
 	"fmt"
+	"github.com/EdgarTeng/etlog/common/bufferpool"
 	"strings"
 )
 
 type Format int
+
+const (
+	defaultTimeFormat = "2006-01-02 15:04:05.000000"
+)
 
 const (
 	defaultFormat        = SIMPLE
@@ -34,11 +39,10 @@ func (f Format) String() string {
 }
 
 type Formatter interface {
-	Format(entry *LogEntry) string
+	Format(entry *LogEntry) *bufferpool.Buffer
 }
 
 type SimpleFormatter struct {
-	format string
 }
 
 func FormatterFactory(format Format) Formatter {
@@ -52,14 +56,25 @@ func FormatterFactory(format Format) Formatter {
 }
 
 func NewSimpleFormatter() *SimpleFormatter {
-	return &SimpleFormatter{
-		format: "%s\t%s\t%s\n",
-	}
+	//format: "time  level  msg"
+	return &SimpleFormatter{}
 }
 
-func (sf SimpleFormatter) Format(entry *LogEntry) string {
-	fmtTime := fmt.Sprintf(entry.Time.Format("2006-01-02 15:04:05.000000"))
-	return fmt.Sprintf(sf.format, fmtTime, entry.Level, entry.Msg)
+func (sf SimpleFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
+	buf := bufferpool.Borrow()
+	// timestamp
+	buf.AppendString(entry.Time.Format(defaultTimeFormat))
+	buf.AppendByte('\t')
+
+	// level
+	buf.AppendString(fmt.Sprint(entry.Level))
+	buf.AppendByte('\t')
+
+	// msg
+	buf.AppendValue(entry.Msg)
+	buf.AppendByte('\n')
+
+	return buf
 }
 
 type FullFormatter struct {
@@ -67,50 +82,47 @@ type FullFormatter struct {
 }
 
 func NewFullFormatter() *FullFormatter {
-	return &FullFormatter{
-		// format: "time|level|line|func|message|error|fields"
-		format: "%s|%s|%s|%s|%s|%s|%s\n",
-	}
+	// format: "time|level|line|func|message|error|fields"
+	return &FullFormatter{}
 }
 
-func (ff FullFormatter) Format(entry *LogEntry) string {
-	fmtTime := fmt.Sprintf(entry.Time.Format("2006-01-02 15:04:05.000000"))
-	builder := &strings.Builder{}
+func (ff FullFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
+	buf := bufferpool.Borrow()
 	// timestamp
-	builder.WriteString(fmtTime)
-	builder.WriteString("|")
+	buf.AppendString(entry.Time.Format(defaultTimeFormat))
+	buf.AppendByte('|')
+
 	// level
-	builder.WriteString(fmt.Sprintf("%s", entry.Level))
-	builder.WriteString("|")
+	buf.AppendString(fmt.Sprint(entry.Level))
+	buf.AppendByte('|')
 
 	// line & func
 	if entry.SrcValid {
-		builder.WriteString(entry.Line)
-		builder.WriteString("|")
-		builder.WriteString(entry.FuncName)
+		buf.AppendString(entry.Line)
+		buf.AppendByte('|')
+		buf.AppendString(entry.FuncName)
 	} else {
-		builder.WriteString("-|-")
+		buf.AppendString("-|-")
 	}
-	builder.WriteString("|")
+	buf.AppendByte('|')
 
 	// msg
-	builder.WriteString(entry.Msg)
-	builder.WriteString("|")
+	buf.AppendString(entry.Msg)
+	buf.AppendByte('|')
 
 	// error
 	if entry.Err != nil {
-		builder.WriteString(fmt.Sprintf("%s", entry.Err))
+		buf.AppendString(fmt.Sprint(entry.Err))
 	} else {
-		builder.WriteString("-")
+		buf.AppendByte('-')
 	}
-	builder.WriteString("|")
+	buf.AppendByte('|')
 
 	// fields
 	if entry.Fields != nil && len(entry.Fields) > 0 {
-		builder.WriteString(fmt.Sprintf("%s", entry.Fields))
-
+		buf.AppendBytes(entry.Fields.Bytes())
 	}
-	builder.WriteString("\n")
+	buf.AppendByte('\n')
 
-	return builder.String()
+	return buf
 }

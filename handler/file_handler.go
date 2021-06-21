@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"github.com/EdgarTeng/etlog/common/bufferpool"
 	"io/fs"
 	"math"
 	"os"
@@ -96,8 +97,10 @@ func (fh *FileHandler) Handle(entry *core.LogEntry) error {
 		}
 	}
 
-	msg := fh.BaseHandler.formatter.Format(entry)
-	if err := fh.Flush(msg); err != nil {
+	buf := fh.BaseHandler.formatter.Format(entry)
+	defer buf.Free()
+
+	if err := fh.Flush(buf); err != nil {
 		return err
 	}
 	return nil
@@ -132,18 +135,18 @@ func (fh *FileHandler) createFile() error {
 	return nil
 }
 
-func (fh *FileHandler) Flush(msg string) error {
+func (fh *FileHandler) Flush(buf *bufferpool.Buffer) error {
 	fh.rotateLock.RLock()
 	defer fh.rotateLock.RUnlock()
 
 	fh.flushLock.Lock()
 	defer fh.flushLock.Unlock()
 
-	if _, err := fh.fileWriter.WriteString(msg); err != nil {
+	if _, err := fh.fileWriter.Write(buf.Bytes()); err != nil {
 		return errors.Wrap(err, "write file error")
 	}
 
-	atomic.AddInt64(&fh.writenSize, int64(len([]byte(msg))))
+	atomic.AddInt64(&fh.writenSize, int64(len(buf.Bytes())))
 	return nil
 }
 

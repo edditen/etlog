@@ -51,6 +51,10 @@ func (b *Buffer) AppendFloat(f float64, bitSize int) {
 	b.bs = strconv.AppendFloat(b.bs, f, 'f', -1, bitSize)
 }
 
+func (b *Buffer) AppendBytes(bs []byte) {
+	b.bs = append(b.bs, bs...)
+}
+
 // Len returns the length of the underlying byte slice.
 func (b *Buffer) Len() int {
 	return len(b.bs)

@@ -8,7 +8,7 @@ import (
 )
 
 func BenchmarkBorrow(b *testing.B) {
-	b.Run("when no buffer", func(b *testing.B) {
+	b.Run("when no pool", func(b *testing.B) {
 		p := NewChannelPool(1024)
 		for i := 0; i < b.N; i++ {
 			for j := 0; j < 1e5; j++ {
