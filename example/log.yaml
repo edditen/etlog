@@ -26,9 +26,9 @@ handlers:
       backup_count: 15
       backup_time: 7d
     sync:
-      sync_write: false
+      async_write: true
       flush_interval: 100
-      queue_size: 10000
+      queue_size: 8192
     message:
       format: full
       fields_format: JSON

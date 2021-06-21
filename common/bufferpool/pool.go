@@ -7,19 +7,19 @@ type Pool interface {
 	Return(buf *Buffer)
 }
 
-type ChannelPool struct {
+type ChanPool struct {
 	pool chan *Buffer
 }
 
-// NewChannelPool creates a new pool of Buffer.
-func NewChannelPool(max int) *ChannelPool {
-	return &ChannelPool{
+// NewChanPool creates a new pool of Buffer.
+func NewChanPool(max int) *ChanPool {
+	return &ChanPool{
 		pool: make(chan *Buffer, max),
 	}
 }
 
 // Borrow a Buffer from the pool.
-func (p *ChannelPool) Borrow() *Buffer {
+func (p *ChanPool) Borrow() *Buffer {
 	var buf *Buffer
 	select {
 	case buf = <-p.pool:
@@ -33,7 +33,7 @@ func (p *ChannelPool) Borrow() *Buffer {
 }
 
 // Return returns a Buffer to the pool.
-func (p *ChannelPool) Return(buf *Buffer) {
+func (p *ChanPool) Return(buf *Buffer) {
 	select {
 	case p.pool <- buf:
 	default:

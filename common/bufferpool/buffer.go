@@ -70,6 +70,12 @@ func (b *Buffer) Bytes() []byte {
 	return b.bs
 }
 
+func (b *Buffer) BytesCopy() []byte {
+	c := make([]byte, len(b.bs))
+	copy(c, b.bs)
+	return c
+}
+
 // String returns a string copy of the underlying byte slice.
 func (b *Buffer) String() string {
 	return string(b.bs)
