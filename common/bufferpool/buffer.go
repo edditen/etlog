@@ -1,6 +1,7 @@
 package bufferpool
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 )
@@ -8,121 +9,131 @@ import (
 // Buffer is a thin wrapper around a byte slice. It's intended to be pooled, so
 // the only way to construct one is via a Pool.
 type Buffer struct {
-	bs   []byte
+	buf  *bytes.Buffer
 	pool Pool
 }
 
-func newBuffer(pool Pool) *Buffer {
+func newBuffer() *Buffer {
 	return &Buffer{
-		bs:   make([]byte, 0),
-		pool: pool,
+		buf: &bytes.Buffer{},
 	}
 }
 
 // AppendByte writes a single byte to the Buffer.
 func (b *Buffer) AppendByte(v byte) {
-	b.bs = append(b.bs, v)
+	b.buf.WriteByte(v)
 }
 
 // AppendString writes a string to the Buffer.
 func (b *Buffer) AppendString(s string) {
-	b.bs = append(b.bs, s...)
+	b.buf.WriteString(s)
 }
 
 // AppendInt appends an integer to the underlying buffer (assuming base 10).
 func (b *Buffer) AppendInt(i int64) {
-	b.bs = strconv.AppendInt(b.bs, i, 10)
+	b.buf.WriteString(strconv.FormatInt(i, 10))
 }
 
 // AppendUint appends an unsigned integer to the underlying buffer (assuming
 // base 10).
 func (b *Buffer) AppendUint(i uint64) {
-	b.bs = strconv.AppendUint(b.bs, i, 10)
+	b.buf.WriteString(strconv.FormatInt(int64(i), 10))
 }
 
 // AppendBool appends a bool to the underlying buffer.
 func (b *Buffer) AppendBool(v bool) {
-	b.bs = strconv.AppendBool(b.bs, v)
+	b.buf.WriteString(strconv.FormatBool(v))
 }
 
 // AppendFloat appends a float to the underlying buffer. It doesn't quote NaN
 // or +/- Inf.
-func (b *Buffer) AppendFloat(f float64, bitSize int) {
-	b.bs = strconv.AppendFloat(b.bs, f, 'f', -1, bitSize)
+func (b *Buffer) AppendFloat(f float64) {
+	b.buf.WriteString(strconv.FormatFloat(f, 'f', -1, 32))
 }
 
 func (b *Buffer) AppendBytes(bs []byte) {
-	b.bs = append(b.bs, bs...)
+	b.buf.Write(bs)
 }
 
 // Len returns the length of the underlying byte slice.
 func (b *Buffer) Len() int {
-	return len(b.bs)
+	return b.buf.Len()
 }
 
 // Cap returns the capacity of the underlying byte slice.
 func (b *Buffer) Cap() int {
-	return cap(b.bs)
+	return b.buf.Cap()
 }
 
 // Bytes returns a mutable reference to the underlying byte slice.
 func (b *Buffer) Bytes() []byte {
-	return b.bs
-}
-
-func (b *Buffer) BytesCopy() []byte {
-	c := make([]byte, len(b.bs))
-	copy(c, b.bs)
-	return c
+	return b.buf.Bytes()
 }
 
 // String returns a string copy of the underlying byte slice.
 func (b *Buffer) String() string {
-	return string(b.bs)
+	return b.buf.String()
 }
 
 // Reset resets the underlying byte slice. Subsequent writes re-use the slice's
 // backing array.
 func (b *Buffer) Reset() {
-	b.bs = b.bs[:0]
+	b.buf.Reset()
 }
 
 // Write implements io.Writer.
 func (b *Buffer) Write(bs []byte) (int, error) {
-	b.bs = append(b.bs, bs...)
-	return len(bs), nil
+	b.buf.Write(bs)
+	return b.buf.Len(), nil
 }
 
 // Free returns the Buffer to its Pool.
 //
 // Callers must not retain references to the Buffer after calling Free.
 func (b *Buffer) Free() {
-	b.pool.Return(b)
+	if b.pool != nil {
+		b.pool.Return(b)
+	}
 }
 
 // AppendValue append interface value
-func (b *Buffer) AppendValue(value interface{}) {
-	var stringVal = "-"
-	var ok bool
-	var strPtr *string = nil
-	if value != nil {
-		stringVal, ok = value.(string)
-		if !ok {
-			strPtr, ok = value.(*string)
-			if ok && strPtr != nil {
-				stringVal = *strPtr
-			} else {
-				if strPtr != nil {
-					stringVal = fmt.Sprint(value)
-				}
-			}
-		}
+func (b *Buffer) AppendValue(val interface{}) {
+	if val == nil {
+		b.AppendString("<nil>")
+		return
 	}
 
-	if value == nil || stringVal == "" {
-		stringVal = "-"
+	if s, ok := val.(string); ok {
+		b.AppendString(s)
+		return
 	}
-	b.AppendString(stringVal)
+
+	if i, ok := val.(int64); ok {
+		b.AppendInt(i)
+		return
+	}
+
+	if f, ok := val.(float64); ok {
+		b.AppendFloat(f)
+		return
+	}
+
+	if bVal, ok := val.(bool); ok {
+		b.AppendBool(bVal)
+		return
+	}
+
+	if bVal, ok := val.(byte); ok {
+		b.AppendByte(bVal)
+		return
+	}
+
+	if bs, ok := val.([]byte); ok {
+		b.AppendBytes(bs)
+		return
+	}
+
+	b.AppendString(fmt.Sprint(val))
 }
 
 // AppendKeyValue append string key and interface value
@@ -133,11 +144,7 @@ func (b *Buffer) AppendKeyValue(key string, value interface{}) {
 	b.AppendByte(',')
 }
 
-// TrimNewline trims any final "\n" byte from the end of the buffer.
-func (b *Buffer) TrimNewline() {
-	if i := len(b.bs) - 1; i >= 0 {
-		if b.bs[i] == '\n' {
-			b.bs = b.bs[:i]
-		}
-	}
+// AppendNewLine append string key and interface value
+func (b *Buffer) AppendNewLine() {
+	b.buf.WriteByte('\n')
 }

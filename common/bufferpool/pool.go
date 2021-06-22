@@ -1,6 +1,8 @@
 package bufferpool
 
-import "sync"
+import (
+	"sync"
+)
 
 type Pool interface {
 	Borrow() *Buffer
@@ -23,11 +25,11 @@ func (p *ChanPool) Borrow() *Buffer {
 	var buf *Buffer
 	select {
 	case buf = <-p.pool:
-		buf.pool = p
 		buf.Reset()
 	default:
-		buf = newBuffer(p)
+		buf = newBuffer()
 	}
+	buf.pool = p
 
 	return buf
 }
@@ -47,12 +49,13 @@ type SyncPool struct {
 }
 
 // NewSyncPool constructs a new Pool.
-func NewSyncPool(max int) *SyncPool {
-	return &SyncPool{pool: &sync.Pool{
-		New: func() interface{} {
-			return &Buffer{bs: make([]byte, 0, max)}
-		},
-	}}
+func NewSyncPool() *SyncPool {
+	return &SyncPool{
+		pool: &sync.Pool{
+			New: func() interface{} {
+				return newBuffer()
+			},
+		}}
 }
 
 // Borrow retrieves a Buffer from the pool, creating one if necessary.

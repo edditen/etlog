@@ -4,7 +4,7 @@ handlers:
   - type: std
     levels:
       - debug
-      - info
+#      - info
       - error
     message:
       format: simple

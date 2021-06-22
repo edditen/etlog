@@ -1,9 +1,7 @@
 package bufferpool
 
-const _size = 1024 // by default, create 1 KiB buffers
-
 var (
-	pool = NewSyncPool(_size)
+	pool = NewSyncPool()
 )
 
 // Borrow retrieves a buffer from the pool, creating one if necessary.

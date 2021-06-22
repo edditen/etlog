@@ -72,7 +72,7 @@ func (sf SimpleFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
 
 	// msg
 	buf.AppendValue(entry.Msg)
-	buf.AppendByte('\n')
+	buf.AppendNewLine()
 
 	return buf
 }
@@ -122,7 +122,7 @@ func (ff FullFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
 	if entry.Fields != nil && len(entry.Fields) > 0 {
 		buf.AppendBytes(entry.Fields.Bytes())
 	}
-	buf.AppendByte('\n')
+	buf.AppendNewLine()
 
 	return buf
 }

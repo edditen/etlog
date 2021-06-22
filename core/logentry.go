@@ -3,7 +3,8 @@ package core
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
+	"github.com/EdgarTeng/etlog/common/utils"
+	"log"
 	"time"
 )
 
@@ -34,17 +35,8 @@ func (f Fields) Bytes() []byte {
 	}
 	builder := &bytes.Buffer{}
 	if err := json.NewEncoder(builder).Encode(f); err != nil {
-		fmt.Println(err.Error())
+		log.Println(err.Error())
 		return []byte{}
 	}
-	return trimNewline(builder.Bytes())
-}
-
-func trimNewline(bs []byte) []byte {
-	if i := len(bs) - 1; i >= 0 {
-		if bs[i] == '\n' {
-			bs = bs[:i]
-		}
-	}
-	return bs
+	return utils.TrimBytes(builder.Bytes())
 }

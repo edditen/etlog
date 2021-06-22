@@ -399,7 +399,7 @@ func (fh *FileHandler) popLogEntry(entries *LogEntries) {
 		for j := 0; j < blockSize && i*blocks+j < len(*entries); j++ {
 			entry := (*entries)[i*blocks+j]
 			b := fh.formatter.Format(entry)
-			buf.AppendBytes(b.BytesCopy())
+			buf.AppendBytes(b.Bytes())
 			b.Free()
 		}
 
