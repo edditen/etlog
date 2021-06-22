@@ -1,7 +1,7 @@
 
 .PHONY: clean
 clean: ## clean logs
-	@rm -f log/*.log
+	@rm -f log/*
 
 .PHONY: test
 test: ## Test all files with unit mode

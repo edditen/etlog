@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/EdgarTeng/etlog/common/bufferpool"
 	"io/fs"
+	"log"
 	"math"
 	"os"
 	"path"
@@ -27,6 +28,7 @@ const (
 	defaultBackupCount               = math.MaxInt32
 	defaultQueueSize                 = 8192
 	defaultFlushInterval             = 100
+	defaultArchiveExt                = ".zip"
 )
 
 type FileHandler struct {
@@ -195,7 +197,8 @@ func (fh *FileHandler) Rotate() error {
 		return nil
 	}
 
-	if err := fh.rotateIt(); err != nil {
+	backupName, err := fh.backup()
+	if err != nil {
 		return err
 	}
 
@@ -203,15 +206,39 @@ func (fh *FileHandler) Rotate() error {
 		return err
 	}
 
+	go fh.postRotate(backupName)
+
 	return nil
 }
 
-func (fh *FileHandler) rotateIt() error {
+func (fh *FileHandler) backup() (string, error) {
 	fh.closeFileWriter()
 
 	backupName := fh.backupFileName()
 	if err := os.Rename(fh.filePath, backupName); err != nil {
-		return errors.Wrap(err, "rotate file error")
+		return "", errors.Wrap(err, "rotate file error")
+	}
+	return backupName, nil
+}
+
+func (fh *FileHandler) postRotate(backupName string) error {
+	// archive
+	if err := fh.archive(backupName); err != nil {
+		log.Printf("%+v", err)
+	}
+
+	if err := os.Remove(backupName); err != nil {
+		log.Printf("%+v", err)
+	}
+	//clean TODO
+
+	return nil
+}
+
+func (fh *FileHandler) archive(backupName string) error {
+	archiveFile := backupName + defaultArchiveExt
+	if err := utils.ZipCompress(backupName, archiveFile); err != nil {
+		errors.Wrap(err, "archive error")
 	}
 	return nil
 }
