@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"github.com/EdgarTeng/etlog/common/bufferpool"
+	"github.com/EdgarTeng/etlog/handler/cleaner"
 	"io/fs"
 	"log"
 	"math"
@@ -53,6 +54,7 @@ type FileHandler struct {
 	ticker         *time.Ticker
 	asyncMutex     *sync.RWMutex
 	queueFull      chan bool
+	cleaner        cleaner.Cleaner
 }
 
 func NewFileHandler(conf *config.HandlerConfig) *FileHandler {
@@ -93,6 +95,10 @@ func (fh *FileHandler) Init() error {
 	}
 
 	if err := fh.settingChan(); err != nil {
+		return err
+	}
+
+	if err := fh.settingCleaner(); err != nil {
 		return err
 	}
 
@@ -227,10 +233,13 @@ func (fh *FileHandler) postRotate(backupName string) error {
 		log.Printf("%+v", err)
 	}
 
+	// remove temporary log
 	if err := os.Remove(backupName); err != nil {
 		log.Printf("%+v", err)
 	}
-	//clean TODO
+
+	//clean
+	fh.cleaner.Clean()
 
 	return nil
 }
@@ -375,6 +384,28 @@ func (fh *FileHandler) settingChan() error {
 	fh.ticker = time.NewTicker(time.Duration(fh.flushInterval) * time.Millisecond)
 
 	go fh.runChan()
+
+	return nil
+}
+
+func (fh *FileHandler) settingCleaner() (err error) {
+	duration := time.Duration(fh.backupTime) * time.Second
+	baseName := fh.fileName[:len(fh.fileName)-len(fh.fileExt)]
+
+	fh.cleaner, err = cleaner.NewFileCleaner(
+		cleaner.SetBackupCount(fh.backupCount),
+		cleaner.SetBackupDir(fh.fileDir),
+		cleaner.SetBackupDuration(duration),
+		cleaner.SetBackupBaseName(baseName),
+		cleaner.SetBackupExt(defaultArchiveExt),
+	)
+	if err != nil {
+		return errors.Wrap(err, "create log cleaner error")
+	}
+
+	if err = fh.cleaner.Init(); err != nil {
+		return errors.Wrap(err, "init log cleaner error")
+	}
 
 	return nil
 }

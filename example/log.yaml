@@ -22,11 +22,11 @@ handlers:
     file: log/info.log
     rollover:
       rollover_interval: 1d
-      rollover_size: 5M
+      rollover_size: 100M
       backup_count: 15
       backup_time: 7d
     sync:
-      async_write: true
+      async_write: false
       flush_interval: 100
       queue_size: 8192
     message:
