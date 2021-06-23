@@ -3,7 +3,9 @@ package handler
 import (
 	"fmt"
 	"github.com/EdgarTeng/etlog/common/bufferpool"
+	"github.com/EdgarTeng/etlog/handler/cleaner"
 	"io/fs"
+	"log"
 	"math"
 	"os"
 	"path"
@@ -27,6 +29,7 @@ const (
 	defaultBackupCount               = math.MaxInt32
 	defaultQueueSize                 = 8192
 	defaultFlushInterval             = 100
+	defaultArchiveExt                = ".zip"
 )
 
 type FileHandler struct {
@@ -51,6 +54,7 @@ type FileHandler struct {
 	ticker         *time.Ticker
 	asyncMutex     *sync.RWMutex
 	queueFull      chan bool
+	cleaner        cleaner.Cleaner
 }
 
 func NewFileHandler(conf *config.HandlerConfig) *FileHandler {
@@ -91,6 +95,10 @@ func (fh *FileHandler) Init() error {
 	}
 
 	if err := fh.settingChan(); err != nil {
+		return err
+	}
+
+	if err := fh.settingCleaner(); err != nil {
 		return err
 	}
 
@@ -195,7 +203,8 @@ func (fh *FileHandler) Rotate() error {
 		return nil
 	}
 
-	if err := fh.rotateIt(); err != nil {
+	backupName, err := fh.backup()
+	if err != nil {
 		return err
 	}
 
@@ -203,15 +212,42 @@ func (fh *FileHandler) Rotate() error {
 		return err
 	}
 
+	go fh.postRotate(backupName)
+
 	return nil
 }
 
-func (fh *FileHandler) rotateIt() error {
+func (fh *FileHandler) backup() (string, error) {
 	fh.closeFileWriter()
 
 	backupName := fh.backupFileName()
 	if err := os.Rename(fh.filePath, backupName); err != nil {
-		return errors.Wrap(err, "rotate file error")
+		return "", errors.Wrap(err, "rotate file error")
+	}
+	return backupName, nil
+}
+
+func (fh *FileHandler) postRotate(backupName string) error {
+	// archive
+	if err := fh.archive(backupName); err != nil {
+		log.Printf("%+v", err)
+	}
+
+	// remove temporary log
+	if err := os.Remove(backupName); err != nil {
+		log.Printf("%+v", err)
+	}
+
+	//clean
+	fh.cleaner.Clean()
+
+	return nil
+}
+
+func (fh *FileHandler) archive(backupName string) error {
+	archiveFile := backupName + defaultArchiveExt
+	if err := utils.ZipCompress(backupName, archiveFile); err != nil {
+		errors.Wrap(err, "archive error")
 	}
 	return nil
 }
@@ -348,6 +384,28 @@ func (fh *FileHandler) settingChan() error {
 	fh.ticker = time.NewTicker(time.Duration(fh.flushInterval) * time.Millisecond)
 
 	go fh.runChan()
+
+	return nil
+}
+
+func (fh *FileHandler) settingCleaner() (err error) {
+	duration := time.Duration(fh.backupTime) * time.Second
+	baseName := fh.fileName[:len(fh.fileName)-len(fh.fileExt)]
+
+	fh.cleaner, err = cleaner.NewFileCleaner(
+		cleaner.SetBackupCount(fh.backupCount),
+		cleaner.SetBackupDir(fh.fileDir),
+		cleaner.SetBackupDuration(duration),
+		cleaner.SetBackupBaseName(baseName),
+		cleaner.SetBackupExt(defaultArchiveExt),
+	)
+	if err != nil {
+		return errors.Wrap(err, "create log cleaner error")
+	}
+
+	if err = fh.cleaner.Init(); err != nil {
+		return errors.Wrap(err, "init log cleaner error")
+	}
 
 	return nil
 }
