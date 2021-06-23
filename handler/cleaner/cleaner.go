@@ -33,9 +33,9 @@ type Cleaner interface {
 	Shutdown()
 }
 
-type Option func(*FileCleaner) error
+type Option func(*LogCleaner) error
 
-type FileCleaner struct {
+type LogCleaner struct {
 	backupDir      string
 	backupBaseName string
 	backupExt      string
@@ -47,10 +47,10 @@ type FileCleaner struct {
 	shutdown       chan interface{}
 }
 
-func NewFileCleaner(options ...Option) (*FileCleaner, error) {
-	fc := &FileCleaner{
-		backupDir:      defaultBackupDir,
-		backupBaseName: defaultBackupBaseName,
+func NewLogCleaner(backupDir, backupBaseName string, options ...Option) (*LogCleaner, error) {
+	fc := &LogCleaner{
+		backupDir:      backupDir,
+		backupBaseName: backupBaseName,
 		backupCount:    defaultBackupCount,
 		backupDuration: defaultBackupDuration,
 		backupExt:      defaultBackupExt,
@@ -69,13 +69,13 @@ func NewFileCleaner(options ...Option) (*FileCleaner, error) {
 
 }
 
-func (fc *FileCleaner) Init() error {
+func (fc *LogCleaner) Init() error {
 	fc.ticker = time.NewTicker(fc.checkInterval)
 	go fc.run()
 	return nil
 }
 
-func (fc *FileCleaner) run() {
+func (fc *LogCleaner) run() {
 	defer fc.ticker.Stop()
 	for {
 		select {
@@ -87,11 +87,11 @@ func (fc *FileCleaner) run() {
 	}
 }
 
-func (fc *FileCleaner) Shutdown() {
+func (fc *LogCleaner) Shutdown() {
 	close(fc.shutdown)
 }
 
-func (fc *FileCleaner) Clean() error {
+func (fc *LogCleaner) Clean() error {
 	fc.mutex.Lock()
 	defer fc.mutex.Unlock()
 
@@ -106,7 +106,7 @@ func (fc *FileCleaner) Clean() error {
 	return nil
 }
 
-func (fc *FileCleaner) removeFiles(files []FileInfo) error {
+func (fc *LogCleaner) removeFiles(files []FileInfo) error {
 	for _, f := range files {
 		if err := os.Remove(path.Join(f.FileDir, f.Filename)); err != nil {
 			return err
@@ -127,7 +127,7 @@ func (fi FileInfo) String() string {
 		fi.FileDir, fi.Filename, fi.BackupTime)
 }
 
-func (fc *FileCleaner) shouldClean() (files []FileInfo, required bool) {
+func (fc *LogCleaner) shouldClean() (files []FileInfo, required bool) {
 	files = make([]FileInfo, 0)
 	required = false
 
@@ -154,7 +154,7 @@ func (fc *FileCleaner) shouldClean() (files []FileInfo, required bool) {
 	return files, required
 }
 
-func (fc *FileCleaner) listBackupFiles() []FileInfo {
+func (fc *LogCleaner) listBackupFiles() []FileInfo {
 	matchedFiles := make([]FileInfo, 0)
 	err := filepath.Walk(fc.backupDir,
 		func(filePath string, info os.FileInfo, err error) error {
@@ -198,7 +198,7 @@ func (fc *FileCleaner) listBackupFiles() []FileInfo {
 	return matchedFiles
 }
 
-func (fc *FileCleaner) expiredFiles(files []FileInfo) []FileInfo {
+func (fc *LogCleaner) expiredFiles(files []FileInfo) []FileInfo {
 	expired := make([]FileInfo, 0)
 	now := time.Now()
 	for _, info := range files {
@@ -211,7 +211,7 @@ func (fc *FileCleaner) expiredFiles(files []FileInfo) []FileInfo {
 
 // gtBackupLimit greater than backup limit,
 // then keep the backup limit files, the oldest files will be returned
-func (fc *FileCleaner) gtBackupLimit(files []FileInfo) []FileInfo {
+func (fc *LogCleaner) gtBackupLimit(files []FileInfo) []FileInfo {
 	if len(files) <= fc.backupCount {
 		return make([]FileInfo, 0)
 	}
@@ -224,7 +224,7 @@ func (fc *FileCleaner) gtBackupLimit(files []FileInfo) []FileInfo {
 	return files[:removeCount]
 }
 
-func (fc *FileCleaner) deduplicateByFilename(fullList, sublist []FileInfo) []FileInfo {
+func (fc *LogCleaner) deduplicateByFilename(fullList, sublist []FileInfo) []FileInfo {
 	if len(fullList) == 0 || len(sublist) == 0 {
 		return fullList
 	}
@@ -243,43 +243,29 @@ func (fc *FileCleaner) deduplicateByFilename(fullList, sublist []FileInfo) []Fil
 	return resultList
 }
 
-func SetBackupDir(backupDir string) Option {
-	return func(cleaner *FileCleaner) error {
-		cleaner.backupDir = backupDir
-		return nil
-	}
-}
-
-func SetBackupBaseName(backupBaseName string) Option {
-	return func(cleaner *FileCleaner) error {
-		cleaner.backupBaseName = backupBaseName
-		return nil
-	}
-}
-
 func SetBackupCount(backupCount int) Option {
-	return func(cleaner *FileCleaner) error {
+	return func(cleaner *LogCleaner) error {
 		cleaner.backupCount = backupCount
 		return nil
 	}
 }
 
 func SetBackupExt(backupExt string) Option {
-	return func(cleaner *FileCleaner) error {
+	return func(cleaner *LogCleaner) error {
 		cleaner.backupExt = backupExt
 		return nil
 	}
 }
 
 func SetCheckInterval(interval time.Duration) Option {
-	return func(cleaner *FileCleaner) error {
+	return func(cleaner *LogCleaner) error {
 		cleaner.checkInterval = interval
 		return nil
 	}
 }
 
 func SetBackupDuration(duration time.Duration) Option {
-	return func(cleaner *FileCleaner) error {
+	return func(cleaner *LogCleaner) error {
 		cleaner.backupDuration = duration
 		return nil
 	}

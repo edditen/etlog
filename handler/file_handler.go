@@ -392,12 +392,10 @@ func (fh *FileHandler) settingCleaner() (err error) {
 	duration := time.Duration(fh.backupTime) * time.Second
 	baseName := fh.fileName[:len(fh.fileName)-len(fh.fileExt)]
 
-	fh.cleaner, err = cleaner.NewFileCleaner(
+	fh.cleaner, err = cleaner.NewLogCleaner(
+		fh.fileDir, baseName,
 		cleaner.SetBackupCount(fh.backupCount),
-		cleaner.SetBackupDir(fh.fileDir),
 		cleaner.SetBackupDuration(duration),
-		cleaner.SetBackupBaseName(baseName),
-		cleaner.SetBackupExt(defaultArchiveExt),
 	)
 	if err != nil {
 		return errors.Wrap(err, "create log cleaner error")

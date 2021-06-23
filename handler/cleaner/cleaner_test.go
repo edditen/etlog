@@ -97,7 +97,7 @@ func TestFileCleaner_expiredFiles(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fc := &FileCleaner{
+			fc := &LogCleaner{
 				backupDir:      tt.fields.backupDir,
 				backupBaseName: tt.fields.backupBaseName,
 				backupExt:      tt.fields.backupExt,
@@ -191,7 +191,7 @@ func TestFileCleaner_gtBackupLimit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fc := &FileCleaner{
+			fc := &LogCleaner{
 				backupDir:      tt.fields.backupDir,
 				backupBaseName: tt.fields.backupBaseName,
 				backupExt:      tt.fields.backupExt,
@@ -267,7 +267,7 @@ func TestFileCleaner_deduplicateByFilename(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fc := &FileCleaner{
+			fc := &LogCleaner{
 				backupDir:      tt.fields.backupDir,
 				backupBaseName: tt.fields.backupBaseName,
 				backupExt:      tt.fields.backupExt,
@@ -289,6 +289,7 @@ func TestBaseName(t *testing.T) {
 		ext := ".log"
 		baseName := filename[:len(filename)-len(ext)]
 		t.Log(baseName)
+		t.Log(0 * time.Second)
 		if baseName != "info" {
 			t.Errorf("want; %s, got: %s", "info", baseName)
 		}
