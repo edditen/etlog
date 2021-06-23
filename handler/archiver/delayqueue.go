@@ -3,9 +3,14 @@ package archiver
 import (
 	"container/heap"
 	"fmt"
+	"github.com/pkg/errors"
 	"sync"
 	"sync/atomic"
 	"time"
+)
+
+var (
+	ErrQueueIsFull = errors.New("queue is full")
 )
 
 // The start of PriorityQueue implementation.
@@ -55,6 +60,10 @@ func (s *sorter) Len() int {
 	return len(s.items)
 }
 
+func (s *sorter) Cap() int {
+	return cap(s.items)
+}
+
 func (s *sorter) Less(i, j int) bool {
 	return s.items[i].Less(s.items[j])
 }
@@ -67,25 +76,42 @@ func (s *sorter) Swap(i, j int) {
 
 // PriorityQueue priority queue struct
 type PriorityQueue struct {
-	s *sorter
+	s  *sorter
+	mu *sync.RWMutex
 }
 
 func NewPriorityQueue(size int) *PriorityQueue {
-	q := &PriorityQueue{s: newSorter(size)}
+	q := &PriorityQueue{
+		s:  newSorter(size),
+		mu: new(sync.RWMutex),
+	}
 	heap.Init(q.s)
 	return q
 }
 
-func (pq *PriorityQueue) Push(elem *Item) {
+func (pq *PriorityQueue) Push(elem *Item) error {
+	if pq.Len() == pq.Cap() {
+		return ErrQueueIsFull
+	}
+
+	pq.mu.Lock()
+	defer pq.mu.Unlock()
 
 	heap.Push(pq.s, elem)
+	return nil
 }
 
 func (pq *PriorityQueue) Pop() *Item {
+	pq.mu.Lock()
+	defer pq.mu.Unlock()
+
 	return heap.Pop(pq.s).(*Item)
 }
 
 func (pq *PriorityQueue) Top() *Item {
+	pq.mu.RLock()
+	defer pq.mu.RUnlock()
+
 	if len(pq.s.items) > 0 {
 		return pq.s.items[0]
 	}
@@ -93,16 +119,32 @@ func (pq *PriorityQueue) Top() *Item {
 }
 
 func (pq *PriorityQueue) Fix(elem *Item, i int) {
+	pq.mu.Lock()
+	defer pq.mu.Unlock()
+
 	pq.s.items[i] = elem
 	heap.Fix(pq.s, i)
 }
 
 func (pq *PriorityQueue) Remove(i int) *Item {
+	pq.mu.Lock()
+	defer pq.mu.Unlock()
+
 	return heap.Remove(pq.s, i).(*Item)
 }
 
 func (pq *PriorityQueue) Len() int {
+	pq.mu.RLock()
+	defer pq.mu.RUnlock()
+
 	return pq.s.Len()
+}
+
+func (pq *PriorityQueue) Cap() int {
+	pq.mu.RLock()
+	defer pq.mu.RUnlock()
+
+	return pq.s.Cap()
 }
 
 func (pq *PriorityQueue) PeekAndShift(max int64) (*Item, int64) {
@@ -199,13 +241,16 @@ func (dq *DelayQueue) init() {
 }
 
 // Offer inserts the element into the current queue.
-func (dq *DelayQueue) Offer(elem interface{}, expireAt time.Time) {
-	item := &Item{value: elem, priority: expireAt.UnixNano()}
-
+func (dq *DelayQueue) Offer(elem interface{}, expireAt time.Time) error {
 	dq.mu.Lock()
-	dq.pq.Push(item)
+	defer dq.mu.Unlock()
+
+	item := &Item{value: elem, priority: expireAt.UnixNano()}
+	if err := dq.pq.Push(item); err != nil {
+		return err
+	}
+
 	index := item.index
-	dq.mu.Unlock()
 
 	if index == 0 {
 		// A new Item with the earliest expiration is added.
@@ -213,6 +258,7 @@ func (dq *DelayQueue) Offer(elem interface{}, expireAt time.Time) {
 			dq.wakeupC <- struct{}{}
 		}
 	}
+	return nil
 }
 
 // Take inserts the element into the current queue.

@@ -30,20 +30,85 @@ func TestPriorityQueue(t *testing.T) {
 	})
 
 	t.Run("test delay queue", func(t *testing.T) {
-		q := NewDelayQueue(100)
-		now := time.Now()
-		log.Println("start time", now)
-		q.Offer("500", now.Add(500*time.Millisecond))
-		q.Offer("200", now.Add(200*time.Millisecond))
-		q.Offer("10", now.Add(10*time.Millisecond))
-		q.Offer("40", now.Add(40*time.Millisecond))
-		q.Offer("400", now.Add(400*time.Millisecond))
-		for i := 0; i < 5; i++ {
-			elen := q.Take(5 * time.Second)
-			log.Println(elen)
+		q := NewDelayQueue(5)
+		beginTime := time.Now()
+
+		log.Println("start time", beginTime)
+		if err := q.Offer("500", beginTime.Add(500*time.Millisecond)); err != nil {
+			t.Errorf("dont want error %s", err)
 		}
-		elen := q.Take(1 * time.Second)
-		log.Println("done", elen)
+
+		if err := q.Offer("200", beginTime.Add(200*time.Millisecond)); err != nil {
+			t.Errorf("dont want error %s", err)
+		}
+
+		if err := q.Offer("10", beginTime.Add(10*time.Millisecond)); err != nil {
+			t.Errorf("dont want error %s", err)
+		}
+
+		if err := q.Offer("40", beginTime.Add(40*time.Millisecond)); err != nil {
+			t.Errorf("dont want error %s", err)
+		}
+
+		if err := q.Offer("400", beginTime.Add(400*time.Millisecond)); err != nil {
+			t.Errorf("dont want error %s", err)
+		}
+
+		if err := q.Offer("99", beginTime.Add(99*time.Millisecond)); err == nil {
+			t.Errorf("want error %s", err)
+		}
+
+		/////////
+		if elen := q.Take(1 * time.Second); elen != "10" {
+			t.Errorf("want 10, got: %s", elen)
+		}
+		if delay := time.Now().Sub(beginTime); delay < 10*time.Millisecond ||
+			delay > 15*time.Millisecond {
+			t.Errorf("want 10ms, got delay: %s", delay)
+		}
+
+		if elen := q.Take(1 * time.Second); elen != "40" {
+			t.Errorf("want 40, got: %s", elen)
+		}
+		if delay := time.Now().Sub(beginTime); delay < 40*time.Millisecond ||
+			delay > 50*time.Millisecond {
+			t.Errorf("want 40ms, got delay: %s", delay)
+		}
+
+		if elen := q.Take(1 * time.Second); elen != "200" {
+			t.Errorf("want 200, got: %s", elen)
+		}
+		if delay := time.Now().Sub(beginTime); delay < 200*time.Millisecond ||
+			delay > 205*time.Millisecond {
+			t.Errorf("want 200ms, got delay: %s", delay)
+		}
+
+		if elen := q.Take(1 * time.Second); elen != "400" {
+			t.Errorf("want 400, got: %s", elen)
+		}
+		if delay := time.Now().Sub(beginTime); delay < 400*time.Millisecond ||
+			delay > 405*time.Millisecond {
+			t.Errorf("want 400ms, got delay: %s", delay)
+		}
+
+		if elen := q.Take(1 * time.Second); elen != "500" {
+			t.Errorf("want 500, got: %s", elen)
+		}
+		if delay := time.Now().Sub(beginTime); delay < 500*time.Millisecond ||
+			delay > 505*time.Millisecond {
+			t.Errorf("want 500ms, got delay: %s", delay)
+		}
+
+		newBegin := time.Now()
+		if elen := q.Take(1000 * time.Millisecond); elen != nil {
+			t.Errorf("want nil, got: %s", elen)
+		}
+		if delay := time.Now().Sub(newBegin); delay < 1000*time.Millisecond ||
+			delay > 1005*time.Millisecond {
+			t.Errorf("want 1000ms, got delay: %s", delay)
+		}
+
+		log.Println("done")
 
 	})
 }
