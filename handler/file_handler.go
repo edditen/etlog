@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"github.com/EdgarTeng/etlog/common/bufferpool"
+	"github.com/EdgarTeng/etlog/handler/archiver"
 	"github.com/EdgarTeng/etlog/handler/cleaner"
 	"io/fs"
 	"log"
@@ -55,6 +56,7 @@ type FileHandler struct {
 	asyncMutex     *sync.RWMutex
 	queueFull      chan bool
 	cleaner        cleaner.Cleaner
+	archiver       archiver.Archiver
 }
 
 func NewFileHandler(conf *config.HandlerConfig) *FileHandler {
@@ -99,6 +101,10 @@ func (fh *FileHandler) Init() error {
 	}
 
 	if err := fh.settingCleaner(); err != nil {
+		return err
+	}
+
+	if err := fh.settingArchiver(); err != nil {
 		return err
 	}
 
@@ -229,26 +235,15 @@ func (fh *FileHandler) backup() (string, error) {
 
 func (fh *FileHandler) postRotate(backupName string) error {
 	// archive
-	if err := fh.archive(backupName); err != nil {
-		log.Printf("%+v", err)
-	}
-
-	// remove temporary log
-	if err := os.Remove(backupName); err != nil {
+	if err := fh.archiver.Archive(backupName); err != nil {
 		log.Printf("%+v", err)
 	}
 
 	//clean
-	fh.cleaner.Clean()
-
-	return nil
-}
-
-func (fh *FileHandler) archive(backupName string) error {
-	archiveFile := backupName + defaultArchiveExt
-	if err := utils.ZipCompress(backupName, archiveFile); err != nil {
-		errors.Wrap(err, "archive error")
+	if err := fh.cleaner.Clean(); err != nil {
+		log.Printf("%+v", err)
 	}
+
 	return nil
 }
 
@@ -403,6 +398,20 @@ func (fh *FileHandler) settingCleaner() (err error) {
 
 	if err = fh.cleaner.Init(); err != nil {
 		return errors.Wrap(err, "init log cleaner error")
+	}
+
+	return nil
+}
+
+func (fh *FileHandler) settingArchiver() (err error) {
+
+	fh.archiver, err = archiver.NewLogArchiver(fh.fileDir)
+	if err != nil {
+		return errors.Wrap(err, "create log archiver error")
+	}
+
+	if err = fh.archiver.Init(); err != nil {
+		return errors.Wrap(err, "init log archiver error")
 	}
 
 	return nil

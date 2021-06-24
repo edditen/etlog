@@ -191,6 +191,7 @@ func NewDelayQueue(size int) *DelayQueue {
 // Run starts an infinite loop, in which it continually waits for an element
 // to expire and then send the expired
 func (dq *DelayQueue) init() {
+	defer close(dq.C)
 	for {
 
 		dq.mu.Lock()
@@ -269,4 +270,12 @@ func (dq *DelayQueue) Take(timeout time.Duration) interface{} {
 	case <-time.After(timeout):
 		return nil
 	}
+}
+
+func (dq *DelayQueue) Cap() int {
+	return dq.pq.Cap()
+}
+
+func (dq *DelayQueue) Len() int {
+	return dq.pq.Len()
 }
