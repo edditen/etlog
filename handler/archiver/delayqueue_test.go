@@ -3,6 +3,7 @@ package archiver
 import (
 	"fmt"
 	"log"
+	"sync"
 	"testing"
 	"time"
 )
@@ -108,6 +109,42 @@ func TestPriorityQueue(t *testing.T) {
 			t.Errorf("want 1000ms, got delay: %s", delay)
 		}
 
+		log.Println("done")
+
+	})
+}
+
+func TestChan(t *testing.T) {
+	t.Run("test close chan", func(t *testing.T) {
+		exitC := make(chan interface{})
+
+		wg := new(sync.WaitGroup)
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+
+			select {
+			case <-exitC:
+				log.Println("chan shutdown")
+			}
+
+			select {
+			case <-exitC:
+				log.Println("chan shutdown")
+			default:
+				log.Println("default")
+			}
+
+		}()
+
+		go func() {
+			defer wg.Done()
+			time.Sleep(100 * time.Millisecond)
+			close(exitC)
+
+		}()
+
+		wg.Wait()
 		log.Println("done")
 
 	})

@@ -2,6 +2,7 @@ package cleaner
 
 import (
 	"fmt"
+	"github.com/EdgarTeng/etlog/common/runnable"
 	"github.com/EdgarTeng/etlog/common/utils"
 	"github.com/pkg/errors"
 	"log"
@@ -27,10 +28,20 @@ var (
 	defaultTimePattern    = regexp.MustCompile(".*([\\d]{4}-[\\d]{2}-[\\d]{2}\\.[\\d]{6}).*")
 )
 
+type FileInfo struct {
+	FileDir    string
+	Filename   string
+	BackupTime time.Time
+}
+
+func (fi FileInfo) String() string {
+	return fmt.Sprintf("{dir:%s, name:%s, time:%v}",
+		fi.FileDir, fi.Filename, fi.BackupTime)
+}
+
 type Cleaner interface {
-	Init() error
+	runnable.Runnable
 	Clean() error
-	Shutdown()
 }
 
 type Option func(*LogCleaner) error
@@ -44,7 +55,7 @@ type LogCleaner struct {
 	checkInterval  time.Duration
 	mutex          *sync.Mutex
 	ticker         *time.Ticker
-	shutdown       chan interface{}
+	exitC          chan interface{}
 }
 
 func NewLogCleaner(backupDir, backupBaseName string, options ...Option) (*LogCleaner, error) {
@@ -56,7 +67,7 @@ func NewLogCleaner(backupDir, backupBaseName string, options ...Option) (*LogCle
 		backupExt:      defaultBackupExt,
 		checkInterval:  defaultCheckInterval,
 		mutex:          new(sync.Mutex),
-		shutdown:       make(chan interface{}),
+		exitC:          make(chan interface{}),
 	}
 
 	for _, opt := range options {
@@ -69,44 +80,45 @@ func NewLogCleaner(backupDir, backupBaseName string, options ...Option) (*LogCle
 
 }
 
-func (fc *LogCleaner) Init() error {
-	fc.ticker = time.NewTicker(fc.checkInterval)
-	go fc.run()
+func (lc *LogCleaner) Init() error {
+	lc.ticker = time.NewTicker(lc.checkInterval)
+	go lc.Run()
 	return nil
 }
 
-func (fc *LogCleaner) run() {
-	defer fc.ticker.Stop()
+func (lc *LogCleaner) Run() error {
+	defer lc.ticker.Stop()
 	for {
 		select {
-		case <-fc.ticker.C:
-			_ = fc.Clean()
-		case <-fc.shutdown:
+		case <-lc.ticker.C:
+			_ = lc.Clean()
+		case <-lc.exitC:
 			break
 		}
 	}
+	return nil
 }
 
-func (fc *LogCleaner) Shutdown() {
-	close(fc.shutdown)
+func (lc *LogCleaner) Shutdown() {
+	close(lc.exitC)
 }
 
-func (fc *LogCleaner) Clean() error {
-	fc.mutex.Lock()
-	defer fc.mutex.Unlock()
+func (lc *LogCleaner) Clean() error {
+	lc.mutex.Lock()
+	defer lc.mutex.Unlock()
 
-	cleanFiles, required := fc.shouldClean()
+	cleanFiles, required := lc.shouldClean()
 	if !required {
 		return nil
 	}
 
-	if err := fc.removeFiles(cleanFiles); err != nil {
+	if err := lc.removeFiles(cleanFiles); err != nil {
 		return errors.Wrap(err, "remove file error")
 	}
 	return nil
 }
 
-func (fc *LogCleaner) removeFiles(files []FileInfo) error {
+func (lc *LogCleaner) removeFiles(files []FileInfo) error {
 	for _, f := range files {
 		if err := os.Remove(path.Join(f.FileDir, f.Filename)); err != nil {
 			return err
@@ -116,35 +128,24 @@ func (fc *LogCleaner) removeFiles(files []FileInfo) error {
 	return nil
 }
 
-type FileInfo struct {
-	FileDir    string
-	Filename   string
-	BackupTime time.Time
-}
-
-func (fi FileInfo) String() string {
-	return fmt.Sprintf("{dir:%s, name:%s, time:%v}",
-		fi.FileDir, fi.Filename, fi.BackupTime)
-}
-
-func (fc *LogCleaner) shouldClean() (files []FileInfo, required bool) {
+func (lc *LogCleaner) shouldClean() (files []FileInfo, required bool) {
 	files = make([]FileInfo, 0)
 	required = false
 
-	matchedFiles := fc.listBackupFiles()
+	matchedFiles := lc.listBackupFiles()
 	if len(matchedFiles) == 0 {
 		return
 	}
 
-	expiredFiles := fc.expiredFiles(matchedFiles)
+	expiredFiles := lc.expiredFiles(matchedFiles)
 	if len(expiredFiles) > 0 {
 		files = append(files, expiredFiles...)
 		required = true
 	}
 
-	remains := fc.deduplicateByFilename(matchedFiles, expiredFiles)
+	remains := lc.deduplicateByFilename(matchedFiles, expiredFiles)
 
-	cleanFiles := fc.gtBackupLimit(remains)
+	cleanFiles := lc.gtBackupLimit(remains)
 
 	if len(cleanFiles) > 0 {
 		files = append(files, cleanFiles...)
@@ -154,21 +155,21 @@ func (fc *LogCleaner) shouldClean() (files []FileInfo, required bool) {
 	return files, required
 }
 
-func (fc *LogCleaner) listBackupFiles() []FileInfo {
+func (lc *LogCleaner) listBackupFiles() []FileInfo {
 	matchedFiles := make([]FileInfo, 0)
-	err := filepath.Walk(fc.backupDir,
+	err := filepath.Walk(lc.backupDir,
 		func(filePath string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
 
 			filename := info.Name()
-			if filename == fc.backupBaseName {
+			if filename == lc.backupBaseName {
 				return nil
 			}
 
-			if !strings.HasPrefix(filename, fc.backupBaseName) ||
-				!strings.HasSuffix(filename, fc.backupExt) {
+			if !strings.HasPrefix(filename, lc.backupBaseName) ||
+				!strings.HasSuffix(filename, lc.backupExt) {
 				return nil
 			}
 
@@ -198,11 +199,11 @@ func (fc *LogCleaner) listBackupFiles() []FileInfo {
 	return matchedFiles
 }
 
-func (fc *LogCleaner) expiredFiles(files []FileInfo) []FileInfo {
+func (lc *LogCleaner) expiredFiles(files []FileInfo) []FileInfo {
 	expired := make([]FileInfo, 0)
 	now := time.Now()
 	for _, info := range files {
-		if now.Sub(info.BackupTime) > fc.backupDuration {
+		if now.Sub(info.BackupTime) > lc.backupDuration {
 			expired = append(expired, info)
 		}
 	}
@@ -211,8 +212,8 @@ func (fc *LogCleaner) expiredFiles(files []FileInfo) []FileInfo {
 
 // gtBackupLimit greater than backup limit,
 // then keep the backup limit files, the oldest files will be returned
-func (fc *LogCleaner) gtBackupLimit(files []FileInfo) []FileInfo {
-	if len(files) <= fc.backupCount {
+func (lc *LogCleaner) gtBackupLimit(files []FileInfo) []FileInfo {
+	if len(files) <= lc.backupCount {
 		return make([]FileInfo, 0)
 	}
 
@@ -220,11 +221,11 @@ func (fc *LogCleaner) gtBackupLimit(files []FileInfo) []FileInfo {
 		return files[i].BackupTime.Before(files[j].BackupTime)
 	})
 
-	removeCount := len(files) - fc.backupCount
+	removeCount := len(files) - lc.backupCount
 	return files[:removeCount]
 }
 
-func (fc *LogCleaner) deduplicateByFilename(fullList, sublist []FileInfo) []FileInfo {
+func (lc *LogCleaner) deduplicateByFilename(fullList, sublist []FileInfo) []FileInfo {
 	if len(fullList) == 0 || len(sublist) == 0 {
 		return fullList
 	}
