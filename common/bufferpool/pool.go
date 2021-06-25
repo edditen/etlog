@@ -5,7 +5,9 @@ import (
 )
 
 type Pool interface {
+	// Borrow retrieves a Buffer from the pool, creating one if necessary.
 	Borrow() *Buffer
+	// Return returns a Buffer to the pool.
 	Return(buf *Buffer)
 }
 
@@ -13,14 +15,13 @@ type ChanPool struct {
 	pool chan *Buffer
 }
 
-// NewChanPool creates a new pool of Buffer.
+// NewChanPool using chan constructs a new pool of Buffer.
 func NewChanPool(max int) *ChanPool {
 	return &ChanPool{
 		pool: make(chan *Buffer, max),
 	}
 }
 
-// Borrow a Buffer from the pool.
 func (p *ChanPool) Borrow() *Buffer {
 	var buf *Buffer
 	select {
@@ -34,7 +35,6 @@ func (p *ChanPool) Borrow() *Buffer {
 	return buf
 }
 
-// Return returns a Buffer to the pool.
 func (p *ChanPool) Return(buf *Buffer) {
 	select {
 	case p.pool <- buf:
@@ -48,7 +48,7 @@ type SyncPool struct {
 	pool *sync.Pool
 }
 
-// NewSyncPool constructs a new Pool.
+// NewSyncPool using sync.Pool constructs a new Pool.
 func NewSyncPool() *SyncPool {
 	return &SyncPool{
 		pool: &sync.Pool{
@@ -58,7 +58,6 @@ func NewSyncPool() *SyncPool {
 		}}
 }
 
-// Borrow retrieves a Buffer from the pool, creating one if necessary.
 func (p *SyncPool) Borrow() *Buffer {
 	buf := p.pool.Get().(*Buffer)
 	buf.Reset()

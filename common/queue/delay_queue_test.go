@@ -1,34 +1,17 @@
-package archiver
+package queue
 
 import (
-	"fmt"
 	"log"
 	"sync"
 	"testing"
 	"time"
 )
 
-func TestPriorityQueue(t *testing.T) {
+const (
+	diff = 10
+)
 
-	t.Run("test priority queue", func(t *testing.T) {
-		q := NewPriorityQueue(100)
-
-		q.Push(&Item{priority: 8, value: "8"})
-		q.Push(&Item{priority: 7, value: "7"})
-		q.Push(&Item{priority: 2, value: "6"})
-		q.Push(&Item{priority: 1, value: "5"})
-		q.Push(&Item{priority: 5, value: "5"})
-		q.Push(&Item{priority: 4, value: "4"})
-
-		x := q.Pop()
-		fmt.Println(x.priority, x.value)
-
-		for q.Len() > 0 {
-			x = q.Pop()
-			fmt.Println(x.priority, x.value)
-		}
-
-	})
+func TestDelayQueue(t *testing.T) {
 
 	t.Run("test delay queue", func(t *testing.T) {
 		q := NewDelayQueue(5)
@@ -64,7 +47,7 @@ func TestPriorityQueue(t *testing.T) {
 			t.Errorf("want 10, got: %s", elen)
 		}
 		if delay := time.Now().Sub(beginTime); delay < 10*time.Millisecond ||
-			delay > 15*time.Millisecond {
+			delay > (10+diff)*time.Millisecond {
 			t.Errorf("want 10ms, got delay: %s", delay)
 		}
 
@@ -72,7 +55,7 @@ func TestPriorityQueue(t *testing.T) {
 			t.Errorf("want 40, got: %s", elen)
 		}
 		if delay := time.Now().Sub(beginTime); delay < 40*time.Millisecond ||
-			delay > 50*time.Millisecond {
+			delay > (40+diff)*time.Millisecond {
 			t.Errorf("want 40ms, got delay: %s", delay)
 		}
 
@@ -80,7 +63,7 @@ func TestPriorityQueue(t *testing.T) {
 			t.Errorf("want 200, got: %s", elen)
 		}
 		if delay := time.Now().Sub(beginTime); delay < 200*time.Millisecond ||
-			delay > 205*time.Millisecond {
+			delay > (200+diff)*time.Millisecond {
 			t.Errorf("want 200ms, got delay: %s", delay)
 		}
 
@@ -88,7 +71,7 @@ func TestPriorityQueue(t *testing.T) {
 			t.Errorf("want 400, got: %s", elen)
 		}
 		if delay := time.Now().Sub(beginTime); delay < 400*time.Millisecond ||
-			delay > 405*time.Millisecond {
+			delay > (400+diff)*time.Millisecond {
 			t.Errorf("want 400ms, got delay: %s", delay)
 		}
 
@@ -96,7 +79,7 @@ func TestPriorityQueue(t *testing.T) {
 			t.Errorf("want 500, got: %s", elen)
 		}
 		if delay := time.Now().Sub(beginTime); delay < 500*time.Millisecond ||
-			delay > 505*time.Millisecond {
+			delay > (500+diff)*time.Millisecond {
 			t.Errorf("want 500ms, got delay: %s", delay)
 		}
 
@@ -105,7 +88,7 @@ func TestPriorityQueue(t *testing.T) {
 			t.Errorf("want nil, got: %s", elen)
 		}
 		if delay := time.Now().Sub(newBegin); delay < 1000*time.Millisecond ||
-			delay > 1005*time.Millisecond {
+			delay > (1000+diff)*time.Millisecond {
 			t.Errorf("want 1000ms, got delay: %s", delay)
 		}
 
