@@ -1,6 +1,7 @@
 package archiver
 
 import (
+	"github.com/EdgarTeng/etlog/common/queue"
 	"github.com/EdgarTeng/etlog/common/runnable"
 	"github.com/EdgarTeng/etlog/common/utils"
 	"github.com/pkg/errors"
@@ -27,7 +28,7 @@ type LogArchiver struct {
 	backupDir   string
 	backupExt   string
 	backupDelay time.Duration
-	delayQueue  *DelayQueue
+	delayQueue  *queue.DelayQueue
 	exitC       chan interface{}
 }
 
@@ -36,7 +37,7 @@ func NewLogArchiver(backupDir string, options ...ArchiverOpt) (*LogArchiver, err
 		backupDir:   backupDir,
 		backupExt:   defaultBackupExt,
 		backupDelay: defaultBackupDelay,
-		delayQueue:  NewDelayQueue(defaultDelayQueueSize),
+		delayQueue:  queue.NewDelayQueue(defaultDelayQueueSize),
 		exitC:       make(chan interface{}),
 	}
 
