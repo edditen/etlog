@@ -3,6 +3,8 @@ package queue
 import (
 	"fmt"
 	"reflect"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -75,8 +77,68 @@ func TestUnboundQueue_Take(t *testing.T) {
 func BenchmarkUnboundQueue(b *testing.B) {
 	b.Run("bench offer and take concurrently", func(b *testing.B) {
 		q := NewUnboundQueue()
-		for i := 0; i < b.N; i++ {
-			q.Offer(i)
+		wg := new(sync.WaitGroup)
+		iters := 100
+		count := 100000
+		var total int64
+		total = int64(iters) * int64(count)
+		totalNum := total
+
+		b.Logf("begin len:%d, cap:%d", q.Len(), q.Cap())
+		begin := time.Now()
+		for i := 0; i < iters; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for j := 0; j < count; j++ {
+					q.Offer(j)
+				}
+
+			}()
 		}
+
+		wg2 := new(sync.WaitGroup)
+		b.Logf("begin2 len:%d, cap:%d", q.Len(), q.Cap())
+		begin2 := time.Now()
+		for i := 0; i < iters; i++ {
+			wg2.Add(1)
+			go func() {
+				defer wg2.Done()
+				for {
+					q.Take(1000 * time.Millisecond)
+					if atomic.AddInt64(&total, -1) <= 0 {
+						break
+					}
+				}
+
+			}()
+		}
+
+		wg.Wait()
+		offerCost := time.Now().Sub(begin)
+		b.Logf("end len:%d, cap:%d", q.Len(), q.Cap())
+
+		wg2.Wait()
+		takeCost := time.Now().Sub(begin2)
+		b.Logf("end2 len:%d, cap:%d", q.Len(), q.Cap())
+
+		b.Logf("total:%d,\tofferCost:%v,\teach:%dns", totalNum, offerCost, offerCost.Nanoseconds()/totalNum)
+		b.Logf("total:%d,\ttakeCost:%v,\teach:%dns", totalNum, takeCost, offerCost.Nanoseconds()/totalNum)
+		time.Sleep(2 * time.Second)
+		b.Logf("final len:%d, cap:%d", q.Len(), q.Cap())
+		time.Sleep(2 * time.Second)
+		b.Logf("final2 len:%d, cap:%d", q.Len(), q.Cap())
+		time.Sleep(2 * time.Second)
+		b.Logf("final3 len:%d, cap:%d", q.Len(), q.Cap())
+		time.Sleep(2 * time.Second)
+		b.Logf("final4 len:%d, cap:%d", q.Len(), q.Cap())
+		time.Sleep(2 * time.Second)
+		b.Logf("final5 len:%d, cap:%d", q.Len(), q.Cap())
+		time.Sleep(2 * time.Second)
+		b.Logf("final6 len:%d, cap:%d", q.Len(), q.Cap())
+		time.Sleep(2 * time.Second)
+		b.Logf("final7 len:%d, cap:%d", q.Len(), q.Cap())
+		time.Sleep(2 * time.Second)
+		b.Logf("final8 len:%d, cap:%d", q.Len(), q.Cap())
 	})
 }

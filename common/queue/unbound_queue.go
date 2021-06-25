@@ -9,6 +9,7 @@ const (
 	defaultInitCap     = 100
 	defaultScaleFactor = 0.8
 	defaultDownFactor  = 0.2
+	defaultCheckTime   = 5 * time.Second
 )
 
 type UnboundQueue struct {
@@ -27,7 +28,7 @@ func NewUnboundQueue() *UnboundQueue {
 		downFactor: defaultDownFactor,
 		rwMu:       new(sync.RWMutex),
 		mu:         new(sync.Mutex),
-		ticker:     time.NewTicker(5 * time.Second),
+		ticker:     time.NewTicker(defaultCheckTime),
 	}
 
 	go uq.run()
@@ -39,7 +40,7 @@ func (uq *UnboundQueue) run() {
 	for {
 		select {
 		case <-uq.ticker.C:
-			if uq.scaleNeeded() {
+			if uq.shrinkNeeded() {
 				uq.shrink()
 			}
 		}
@@ -85,19 +86,19 @@ func (uq *UnboundQueue) Offer(val interface{}) error {
 
 func (uq *UnboundQueue) Len() int {
 	uq.rwMu.RLock()
-	uq.rwMu.RUnlock()
+	defer uq.rwMu.RUnlock()
 	return len(uq.blockingC)
 }
 
 func (uq *UnboundQueue) Cap() int {
 	uq.rwMu.RLock()
-	uq.rwMu.RUnlock()
+	defer uq.rwMu.RUnlock()
 	return cap(uq.blockingC)
 }
 
 func (uq *UnboundQueue) scaleNeeded() bool {
 	uq.rwMu.RLock()
-	uq.rwMu.RUnlock()
+	defer uq.rwMu.RUnlock()
 	threshold := int(uq.upFactor * float32(cap(uq.blockingC)))
 	if len(uq.blockingC) > threshold {
 		return true
@@ -138,9 +139,9 @@ func (uq *UnboundQueue) shrink() {
 
 func (uq *UnboundQueue) shrinkNeeded() bool {
 	uq.rwMu.RLock()
-	uq.rwMu.RUnlock()
+	defer uq.rwMu.RUnlock()
 	threshold := int(uq.downFactor * float32(cap(uq.blockingC)))
-	if len(uq.blockingC) < threshold && len(uq.blockingC)/2 >= defaultInitCap {
+	if len(uq.blockingC) < threshold && cap(uq.blockingC)/2 >= defaultInitCap {
 		return true
 	}
 	return false
