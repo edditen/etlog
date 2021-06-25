@@ -51,6 +51,9 @@ func (uq *UnboundQueue) Take(timeout time.Duration) (interface{}, error) {
 		return nil, ErrNotInit
 	}
 
+	uq.rwMu.RLock()
+	defer uq.rwMu.RUnlock()
+
 	select {
 	case val := <-uq.blockingC:
 		return val, nil
@@ -67,6 +70,9 @@ func (uq *UnboundQueue) Offer(val interface{}) error {
 	if uq.scaleNeeded() {
 		uq.scale()
 	}
+
+	uq.rwMu.RLock()
+	defer uq.rwMu.RUnlock()
 
 	select {
 	case uq.blockingC <- val:
@@ -109,7 +115,7 @@ func (uq *UnboundQueue) scale() {
 	}
 
 	uq.rwMu.Lock()
-	uq.rwMu.Unlock()
+	defer uq.rwMu.Unlock()
 	newCap := cap(uq.blockingC) * 2
 	uq.blockingC = uq.newAndCopy(newCap)
 }
@@ -124,7 +130,7 @@ func (uq *UnboundQueue) shrink() {
 	}
 
 	uq.rwMu.Lock()
-	uq.rwMu.Unlock()
+	defer uq.rwMu.Unlock()
 
 	newCap := cap(uq.blockingC) / 2
 	uq.blockingC = uq.newAndCopy(newCap)
