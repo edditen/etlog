@@ -105,7 +105,9 @@ func BenchmarkUnboundQueue(b *testing.B) {
 			go func() {
 				defer wg2.Done()
 				for {
-					q.Take(1000 * time.Millisecond)
+					if _, err := q.Take(1000 * time.Millisecond); err != nil {
+						b.Log(err)
+					}
 					if atomic.AddInt64(&total, -1) <= 0 {
 						break
 					}
