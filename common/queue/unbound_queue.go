@@ -118,6 +118,7 @@ func (uq *UnboundQueue) scale() {
 	uq.rwMu.Lock()
 	defer uq.rwMu.Unlock()
 	newCap := cap(uq.blockingC) * 2
+
 	uq.blockingC = uq.newAndCopy(newCap)
 }
 
@@ -150,6 +151,7 @@ func (uq *UnboundQueue) shrinkNeeded() bool {
 func (uq *UnboundQueue) newAndCopy(newCap int) (newC chan interface{}) {
 	newC = make(chan interface{}, newCap)
 	chanCopy(uq.blockingC, newC)
+	close(uq.blockingC)
 	return
 }
 
