@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"github.com/EdgarTeng/etlog/common/bufferpool"
+	"github.com/EdgarTeng/etlog/common/queue"
 	"github.com/EdgarTeng/etlog/handler/archiver"
 	"github.com/EdgarTeng/etlog/handler/cleaner"
 	"io/fs"
@@ -21,51 +22,60 @@ import (
 )
 
 const (
-	fileFlag                         = os.O_APPEND | os.O_CREATE | os.O_WRONLY
-	fileMode             fs.FileMode = 0644
-	backupTimeFormat                 = "2006-01-02.150405"
-	defaultLogSize                   = "10G"
-	defaultRolloverTime              = "1d"
-	defaultBackupTime                = "365d"
-	defaultBackupCount               = math.MaxInt32
-	defaultQueueSize                 = 8192
-	defaultFlushInterval             = 100
+	fileFlag                           = os.O_APPEND | os.O_CREATE | os.O_WRONLY
+	fileMode               fs.FileMode = 0644
+	backupTimeFormat                   = "2006-01-02.150405"
+	defaultLogSize                     = "10G"
+	defaultRolloverTime                = "1d"
+	defaultBackupTime                  = "365d"
+	defaultBackupCount                 = math.MaxInt32
+	defaultQueueSize                   = 8192
+	defaultFlushInterval               = 100
+	defaultBlockSize                   = 256
+	defaultNotifyThreshold             = 8192
+	defaultMaxCapability               = 4e6
 )
 
 type LogEntries = []*core.LogEntry
 
 type FileHandler struct {
 	*BaseHandler
-	fileWriter     *os.File
-	filePath       string
-	fileDir        string
-	fileExt        string
-	fileName       string
-	rotateSize     int
-	rotateInterval int
-	backupTime     int
-	backupCount    int
-	writtenSize    int64
-	rotateAt       time.Time
-	rotateLock     *sync.RWMutex
-	flushLock      *sync.Mutex
-	asyncWrite     bool
-	queueSize      int
-	flushInterval  int
-	entryChan      chan *core.LogEntry
-	entryBuf       []*core.LogEntry
-	ticker         *time.Ticker
-	asyncMutex     *sync.RWMutex
-	queueFull      chan bool
-	cleaner        cleaner.Cleaner
-	archiver       archiver.Archiver
+	fileWriter      *os.File
+	filePath        string
+	fileDir         string
+	fileExt         string
+	fileName        string
+	rotateSize      int
+	rotateInterval  int
+	backupTime      int
+	backupCount     int
+	writtenSize     int64
+	rotateAt        time.Time
+	rotateLock      *sync.RWMutex
+	flushLock       *sync.Mutex
+	asyncWrite      bool
+	queueSize       int
+	flushInterval   int
+	entryQueue      *queue.UnboundQueue
+	entryBuf        []*core.LogEntry
+	ticker          *time.Ticker
+	asyncMutex      *sync.RWMutex
+	queueFull       chan bool
+	cleaner         cleaner.Cleaner
+	archiver        archiver.Archiver
+	blockSize       int
+	notifyThreshold int
+	maxCapability   int
 }
 
 func NewFileHandler(conf *config.HandlerConfig) *FileHandler {
 	return &FileHandler{
-		BaseHandler: NewBaseHandler(conf),
-		rotateLock:  new(sync.RWMutex),
-		flushLock:   new(sync.Mutex),
+		BaseHandler:     NewBaseHandler(conf),
+		rotateLock:      new(sync.RWMutex),
+		flushLock:       new(sync.Mutex),
+		blockSize:       defaultBlockSize,
+		notifyThreshold: defaultNotifyThreshold,
+		maxCapability:   defaultMaxCapability,
 	}
 }
 
@@ -119,12 +129,20 @@ func (fh *FileHandler) Handle(entry *core.LogEntry) error {
 	}
 
 	if fh.asyncWrite {
-		select {
-		case fh.entryChan <- entry:
-		default:
-			fh.syncHandle(entry)
-			fh.notifyFull()
+		if fh.entryQueue.Len() > fh.maxCapability {
+			return errors.New("log buff queue is full")
 		}
+		if err := fh.entryQueue.Offer(entry); err != nil {
+			return errors.Wrap(err, "log into queue error")
+		}
+		if fh.entryQueue.Len() > fh.notifyThreshold {
+			select {
+			case fh.queueFull <- true:
+				fh.notifyFull()
+			default:
+			}
+		}
+
 		return nil
 	}
 	return fh.syncHandle(entry)
@@ -377,11 +395,11 @@ func (fh *FileHandler) settingChan() error {
 
 	fh.asyncMutex = new(sync.RWMutex)
 	fh.queueFull = make(chan bool)
-	fh.entryChan = make(chan *core.LogEntry, fh.queueSize)
+	fh.entryQueue = queue.NewUnboundQueue()
 	fh.entryBuf = make([]*core.LogEntry, 0)
 	fh.ticker = time.NewTicker(time.Duration(fh.flushInterval) * time.Millisecond)
 
-	go fh.runChan()
+	fh.processLogEntries()
 
 	return nil
 }
@@ -427,17 +445,24 @@ func (fh *FileHandler) notifyFull() {
 	}
 }
 
-func (fh *FileHandler) runChan() {
-	for {
-		select {
-		case logEntry := <-fh.entryChan:
-			fh.appendLogEntry(logEntry)
-		case <-fh.ticker.C:
-			fh.handleLogEntry()
-		case <-fh.queueFull:
-			fh.handleLogEntry()
+func (fh *FileHandler) processLogEntries() {
+	go func() {
+		for {
+			if val, err := fh.entryQueue.Take(5 * time.Second); err == nil {
+				fh.appendLogEntry(val.(*core.LogEntry))
+			}
 		}
-	}
+	}()
+	go func() {
+		for {
+			select {
+			case <-fh.ticker.C:
+				fh.handleLogEntry()
+			case <-fh.queueFull:
+				fh.handleLogEntry()
+			}
+		}
+	}()
 }
 
 func (fh *FileHandler) appendLogEntry(entry *core.LogEntry) {
@@ -455,12 +480,11 @@ func (fh *FileHandler) handleLogEntry() {
 		return
 	}
 
-	blockSize := 256
-	blocks := utils.CalculateBlocks(len(fh.entryBuf), blockSize)
+	blocks := utils.CalculateBlocks(len(fh.entryBuf), fh.blockSize)
 	for i := 0; i < blocks; i++ {
 		buf := bufferpool.Borrow()
 
-		for j := 0; j < blockSize && i*blocks+j < len(fh.entryBuf); j++ {
+		for j := 0; j < fh.blockSize && i*blocks+j < len(fh.entryBuf); j++ {
 			entry := fh.entryBuf[i*blocks+j]
 			b := fh.formatter.Format(entry)
 			buf.AppendBytes(b.Bytes())
