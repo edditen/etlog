@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
+	//RunAll()
 	RunRotate()
 	log.Println("done")
 
@@ -49,6 +50,7 @@ func RunRotate() {
 		log.Fatalf("err: %+v", err)
 	}
 	etlog.SetDefaultLog(logger)
+	etlog.Log.WithField("beginTime", time.Now()).Info("start test")
 
 	endTime := time.Now().Add(30 * time.Second)
 	wg := new(sync.WaitGroup)
@@ -59,10 +61,11 @@ func RunRotate() {
 			defer wg.Done()
 			for {
 				etlog.Log.
+					WithMarker("trace").
 					WithField("key", "word").
 					WithField("index", index).
 					WithField("now", time.Now()).
-					Info("this is message")
+					Data("this is message")
 
 				if time.Now().After(endTime) {
 					break
@@ -71,6 +74,7 @@ func RunRotate() {
 		}()
 	}
 	wg.Wait()
+	etlog.Log.WithField("endTime", time.Now()).Info("complete test")
 	time.Sleep(10 * time.Second)
 
 }

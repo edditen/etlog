@@ -60,18 +60,32 @@ func NewSimpleFormatter() *SimpleFormatter {
 	return &SimpleFormatter{}
 }
 
-func (sf SimpleFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
+func (sf *SimpleFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
 	buf := bufferpool.Borrow()
 	// timestamp
 	buf.AppendString(entry.Time.Format(defaultTimeFormat))
-	buf.AppendByte('\t')
+	buf.AppendByte(' ')
 
 	// level
+	buf.AppendByte('[')
 	buf.AppendString(fmt.Sprint(entry.Level))
+	buf.AppendByte(']')
 	buf.AppendByte('\t')
 
 	// msg
+	buf.AppendString("|msg:=")
 	buf.AppendValue(entry.Msg)
+
+	if entry.Err != nil {
+		buf.AppendString("|err:=")
+		buf.AppendString(fmt.Sprint(entry.Err))
+	}
+
+	if entry.Fields != nil && len(entry.Fields) > 0 {
+		buf.AppendString("|fields:=")
+		buf.AppendBytes(entry.Fields.Bytes())
+	}
+
 	buf.AppendNewLine()
 
 	return buf
@@ -86,7 +100,7 @@ func NewFullFormatter() *FullFormatter {
 	return &FullFormatter{}
 }
 
-func (ff FullFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
+func (ff *FullFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
 	buf := bufferpool.Borrow()
 	// timestamp
 	buf.AppendString(entry.Time.Format(defaultTimeFormat))

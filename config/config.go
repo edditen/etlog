@@ -8,6 +8,20 @@ import (
 	stdlog "log"
 )
 
+var (
+	DefaultConfig = NewConfig("")
+)
+
+func init() {
+	handlerConfig := NewHandlerConfig()
+	handlerConfig.Type = "std"
+	handlerConfig.Levels = []string{"debug", "info", "data", "warn", "error", "fatal"}
+	handlerConfig.Message.Format = "simple"
+	DefaultConfig.LogConf.Handlers = append(DefaultConfig.LogConf.Handlers, *handlerConfig)
+	DefaultConfig.LogConf.Level = "debug"
+	DefaultConfig.LogConf.Name = "default"
+}
+
 type Config struct {
 	configPath string
 	LogConf    *LogConfig
@@ -50,6 +64,7 @@ func NewLogConfig() *LogConfig {
 
 type HandlerConfig struct {
 	Type     string          `yaml:"type"`
+	Marker   string          `yaml:"marker"`
 	Levels   []string        `yaml:"levels"`
 	File     string          `yaml:"file"`
 	Rollover *RolloverConfig `yaml:"rollover"`

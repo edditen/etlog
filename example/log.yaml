@@ -4,7 +4,7 @@ handlers:
   - type: std
     levels:
       - debug
-      #      - info
+      - info
       - error
     message:
       format: simple
@@ -56,3 +56,22 @@ handlers:
     message:
       format: full
 
+  - type: file
+    marker: trace
+    levels:
+      - data
+    file: log/trace.log
+    rollover:
+      rollover_interval: 1d
+      rollover_size: 100M
+      backup_count: 15
+      backup_time: 7d
+    sync:
+      async_write: true
+      flush_interval: 100
+      queue_size: 8192
+    message:
+      format: full
+      fields_format: JSON
+      max_bytes: 8192
+      meta_option: All
