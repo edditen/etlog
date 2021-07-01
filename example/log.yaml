@@ -12,14 +12,12 @@ handlers:
   - type: file
     levels:
       - debug
-    file: log/debug.log
-    message:
-      format: full
-
-  - type: file
-    levels:
       - info
-    file: log/info.log
+      - data
+      - warn
+      - error
+      - fatal
+    file: log/etlog.log
     rollover:
       rollover_interval: 1d
       rollover_size: 100M
@@ -34,27 +32,6 @@ handlers:
       fields_format: JSON
       max_bytes: 8192
       meta_option: All
-
-  - type: file
-    levels:
-      - warn
-    file: log/warn.log
-    message:
-      format: full
-
-  - type: file
-    levels:
-      - error
-    file: log/error.log
-    message:
-      format: full
-
-  - type: file
-    levels:
-      - fatal
-    file: log/fatal.log
-    message:
-      format: full
 
   - type: file
     marker: trace
