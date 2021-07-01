@@ -16,6 +16,11 @@ const (
 
 var Log Logger
 
+func init() {
+	log := newDefaultLogger()
+	Log = log
+}
+
 func SetDefaultLog(log Logger) {
 	Log = log
 }
@@ -70,21 +75,45 @@ func NewDefaultLogger(options ...LoggerOptionFunc) (*DefaultLogger, error) {
 		return nil, err
 	}
 
-	level := core.NewLevel(conf.LogConf.Level)
-	log.Println("[Init] log level:", level)
-
-	handlers := make([]handler.Handler, 0)
-	for _, handlerConf := range conf.LogConf.Handlers {
-		handler := handler.HandlerFactory(&handlerConf)
-		if err := handler.Init(); err != nil {
-			return nil, err
-		}
-		handlers = append(handlers, handler)
+	handlers, level, err := getHandlers(conf)
+	if err != nil {
+		return nil, err
 	}
 
 	logger.internal = NewLoggerInternal(handlers, level)
 
 	return logger, nil
+}
+
+func newDefaultLogger() *DefaultLogger {
+	logger := &DefaultLogger{
+		configPath: DefaultConfigPath,
+	}
+
+	handlers, level, err := getHandlers(config.DefaultConfig)
+	if err != nil {
+		log.Println("new default logger error", err)
+		return nil
+	}
+
+	logger.internal = NewLoggerInternal(handlers, level)
+
+	return logger
+}
+
+func getHandlers(conf *config.Config) ([]handler.Handler, core.Level, error) {
+	level := core.NewLevel(conf.LogConf.Level)
+
+	handlers := make([]handler.Handler, 0)
+	for _, handlerConf := range conf.LogConf.Handlers {
+		handler := handler.HandlerFactory(&handlerConf)
+		if err := handler.Init(); err != nil {
+			return nil, core.DEBUG, err
+		}
+		handlers = append(handlers, handler)
+	}
+	return handlers, level, nil
+
 }
 
 func NewLoggerInternal(handlers []handler.Handler, level core.Level) *LoggerInternal {

@@ -10,13 +10,15 @@ func TestSimpleFormatter_Format(t *testing.T) {
 	t.Run("when short format then simple output", func(t *testing.T) {
 		formatter := NewSimpleFormatter()
 		meta := &LogEntry{
-			Time:  time.Date(2021, 6, 15, 12, 20, 45, 152*1e6, time.UTC),
-			Level: INFO,
-			Msg:   "hello world",
+			Time:   time.Date(2021, 6, 15, 12, 20, 45, 152*1e6, time.UTC),
+			Level:  INFO,
+			Msg:    "hello world",
+			Err:    errors.New("oops"),
+			Fields: map[string]interface{}{"rootCause": "nil pointer"},
 		}
 		got := formatter.Format(meta)
 		t.Log(got)
-		expect := "2021-06-15 12:20:45.152000\tINFO\thello world\n"
+		expect := "2021-06-15 12:20:45.152000 [INFO]\t|msg:=hello world|err:=oops|fields:={\"rootCause\":\"nil pointer\"}\n"
 		if got.String() != expect {
 			t.Errorf("got: %s, expected: %s", got, expect)
 		}

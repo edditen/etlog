@@ -10,18 +10,18 @@ import (
 )
 
 func main() {
-	RunRotate()
+	RunAll()
 	log.Println("done")
 
 }
 
 func RunAll() {
-	logger, err := etlog.NewDefaultLogger(etlog.SetConfigPath("example/log.yaml"))
-	//logger, err := etlog.NewDefaultLogger()
-	if err != nil {
-		log.Fatalf("err: %+v", err)
-	}
-	etlog.SetDefaultLog(logger)
+	//logger, err := etlog.NewDefaultLogger(etlog.SetConfigPath("example/log.yaml"))
+	////logger, err := etlog.NewDefaultLogger()
+	//if err != nil {
+	//	log.Fatalf("err: %+v", err)
+	//}
+	//etlog.SetDefaultLog(logger)
 	etlog.Log.Debug("hello")
 	etlog.Log.Info("hello")
 	etlog.Log.Info("world")
