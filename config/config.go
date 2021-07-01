@@ -64,6 +64,7 @@ func NewLogConfig() *LogConfig {
 
 type HandlerConfig struct {
 	Type     string          `yaml:"type"`
+	Marker   string          `yaml:"marker"`
 	Levels   []string        `yaml:"levels"`
 	File     string          `yaml:"file"`
 	Rollover *RolloverConfig `yaml:"rollover"`

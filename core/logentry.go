@@ -16,6 +16,7 @@ type LogEntry struct {
 	Line     string    `json:"line"`
 	FuncName string    `json:"func"`
 	Msg      string    `json:"msg"`
+	Marker   string    `json:"marker"`
 	Err      error     `json:"error"`
 	Fields   Fields    `json:"fields"`
 	SrcValid bool      `json:"-"`

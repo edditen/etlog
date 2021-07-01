@@ -36,14 +36,18 @@ type Logger interface {
 	Fatal(msg string)
 	WithField(field string, v interface{}) Logger
 	WithError(err error) Logger
+	WithMarker(marker string) Logger
 }
+
+type Handlers = []handler.Handler
 
 type LoggerInternal struct {
 	logLevel   core.Level
-	handlers   []handler.Handler
+	handlers   map[string]*Handlers
 	sourceFlag int
 	err        error
 	fields     map[string]interface{}
+	marker     string
 }
 
 type DefaultLogger struct {
@@ -101,28 +105,39 @@ func newDefaultLogger() *DefaultLogger {
 	return logger
 }
 
-func getHandlers(conf *config.Config) ([]handler.Handler, core.Level, error) {
+func getHandlers(conf *config.Config) (map[string]*Handlers, core.Level, error) {
 	level := core.NewLevel(conf.LogConf.Level)
 
-	handlers := make([]handler.Handler, 0)
+	handlers := make(map[string]*Handlers, 0)
 	for _, handlerConf := range conf.LogConf.Handlers {
 		handler := handler.HandlerFactory(&handlerConf)
 		if err := handler.Init(); err != nil {
 			return nil, core.DEBUG, err
 		}
-		handlers = append(handlers, handler)
+
+		if hs, ok := handlers[handlerConf.Marker]; ok {
+			if hs == nil {
+				hs = &Handlers{handler}
+			} else {
+				*hs = append(*hs, handler)
+			}
+		} else {
+			handlers[handlerConf.Marker] = &Handlers{handler}
+		}
+
 	}
 	return handlers, level, nil
 
 }
 
-func NewLoggerInternal(handlers []handler.Handler, level core.Level) *LoggerInternal {
+func NewLoggerInternal(handlers map[string]*Handlers, level core.Level) *LoggerInternal {
 	return &LoggerInternal{
 		logLevel:   level,
 		handlers:   handlers,
 		fields:     make(map[string]interface{}, 0),
 		sourceFlag: DefaultSkip,
 	}
+
 }
 
 func (li *LoggerInternal) WithField(field string, v interface{}) Logger {
@@ -130,6 +145,11 @@ func (li *LoggerInternal) WithField(field string, v interface{}) Logger {
 		li.fields = make(map[string]interface{}, 0)
 	}
 	li.fields[field] = v
+	return li
+}
+
+func (li *LoggerInternal) WithMarker(marker string) Logger {
+	li.marker = marker
 	return li
 }
 
@@ -167,6 +187,7 @@ func (li *LoggerInternal) finalize(level core.Level, msg string) (entry *core.Lo
 	entry.Time = time.Now()
 	entry.Level = level
 	entry.Msg = msg
+	entry.Marker = li.marker
 	entry.Err = li.err
 	entry.Fields = li.fields
 	if line, funcName, ok := utils.ShortSourceLoc(li.sourceFlag); ok {
@@ -183,9 +204,18 @@ func (li *LoggerInternal) Log(level core.Level, msg string) {
 		return
 	}
 	entry := li.finalize(level, msg)
-	for _, handler := range li.handlers {
-		handler.Handle(entry)
+
+	for marker, handlers := range li.handlers {
+		if handlers == nil {
+			continue
+		}
+		if marker == li.marker {
+			for _, handler := range *handlers {
+				handler.Handle(entry)
+			}
+		}
 	}
+
 	return
 }
 
@@ -235,4 +265,8 @@ func (dl *DefaultLogger) WithError(err error) Logger {
 
 func (dl *DefaultLogger) WithField(field string, v interface{}) Logger {
 	return dl.newInternal().WithField(field, v)
+}
+
+func (dl *DefaultLogger) WithMarker(marker string) Logger {
+	return dl.newInternal().WithMarker(marker)
 }
