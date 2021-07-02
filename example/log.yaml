@@ -46,6 +46,7 @@ handlers:
     sync:
       async_write: true
       flush_interval: 100
+      flush_size: 512
       queue_size: 8192
     message:
       format: full
@@ -60,12 +61,13 @@ handlers:
     file: log/data.log
     rollover:
       rollover_interval: 1d
-      rollover_size: 80M
+      rollover_size: 100M
       backup_count: 30
       backup_time: 7d
     sync:
       async_write: true
       flush_interval: 100
+      flush_size: 256
       queue_size: 8192
     message:
       format: full

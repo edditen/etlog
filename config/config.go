@@ -94,6 +94,7 @@ func NewRolloverConfig() *RolloverConfig {
 type SyncConfig struct {
 	AsyncWrite    bool `yaml:"async_write"`
 	FlushInterval int  `yaml:"flush_interval"`
+	FlushSize     int  `yaml:"flush_size"`
 	QueueSize     int  `yaml:"queue_size"`
 }
 
