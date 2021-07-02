@@ -48,6 +48,7 @@ type BaseHandler struct {
 	handlerConfig *config.HandlerConfig
 	formatter     core.Formatter
 	levels        map[core.Level]interface{}
+	marker        string
 }
 
 func NewBaseHandler(conf *config.HandlerConfig) *BaseHandler {
@@ -61,9 +62,11 @@ func (bh *BaseHandler) Init() error {
 	bh.DefaultSetting()
 	format := core.NewFormat(bh.handlerConfig.Message.Format)
 	bh.formatter = core.FormatterFactory(format)
+	bh.marker = bh.handlerConfig.Marker
 	for _, level := range bh.handlerConfig.Levels {
 		bh.levels[core.NewLevel(level)] = true
 	}
+
 	return nil
 }
 
@@ -79,6 +82,10 @@ func (bh *BaseHandler) Contains(level core.Level) bool {
 		return true
 	}
 	return false
+}
+
+func (bh *BaseHandler) MarkerMatched(marker string) bool {
+	return bh.marker == marker
 }
 
 func (bh *BaseHandler) DefaultSetting() {

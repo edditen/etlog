@@ -30,6 +30,7 @@ const (
 	defaultBackupCount               = math.MaxInt32
 	defaultQueueSize                 = 8192
 	defaultFlushInterval             = 100
+	defaultFlushSize                 = 256
 )
 
 type LogEntries = []*core.LogEntry
@@ -52,7 +53,8 @@ type FileHandler struct {
 	asyncWrite     bool
 	queueSize      int
 	flushInterval  int
-	entryChan      chan *core.LogEntry
+	flushSize      int
+	entryC         chan *core.LogEntry
 	entryBuf       []*core.LogEntry
 	ticker         *time.Ticker
 	asyncMutex     *sync.RWMutex
@@ -114,13 +116,16 @@ func (fh *FileHandler) Init() error {
 }
 
 func (fh *FileHandler) Handle(entry *core.LogEntry) error {
+	if !fh.BaseHandler.MarkerMatched(entry.Marker) {
+		return nil
+	}
 	if !fh.BaseHandler.Contains(entry.Level) {
 		return nil
 	}
 
 	if fh.asyncWrite {
 		select {
-		case fh.entryChan <- entry:
+		case fh.entryC <- entry:
 		default:
 			fh.syncHandle(entry)
 			fh.notifyFull()
@@ -355,17 +360,21 @@ func (fh *FileHandler) settingWrittenSize() error {
 }
 
 func (fh *FileHandler) settingSync() error {
-	fh.asyncWrite = fh.BaseHandler.handlerConfig.Sync.AsyncWrite
 
 	if fh.BaseHandler.handlerConfig.Sync.QueueSize <= 0 {
 		fh.BaseHandler.handlerConfig.Sync.QueueSize = defaultQueueSize
 	}
-	fh.queueSize = fh.BaseHandler.handlerConfig.Sync.QueueSize
-
 	if fh.BaseHandler.handlerConfig.Sync.FlushInterval <= 0 {
 		fh.BaseHandler.handlerConfig.Sync.FlushInterval = defaultFlushInterval
 	}
+	if fh.BaseHandler.handlerConfig.Sync.FlushSize <= 0 {
+		fh.BaseHandler.handlerConfig.Sync.FlushSize = defaultFlushSize
+	}
+
+	fh.queueSize = fh.BaseHandler.handlerConfig.Sync.QueueSize
 	fh.flushInterval = fh.BaseHandler.handlerConfig.Sync.FlushInterval
+	fh.flushSize = fh.BaseHandler.handlerConfig.Sync.FlushSize
+	fh.asyncWrite = fh.BaseHandler.handlerConfig.Sync.AsyncWrite
 
 	return nil
 }
@@ -377,7 +386,7 @@ func (fh *FileHandler) settingChan() error {
 
 	fh.asyncMutex = new(sync.RWMutex)
 	fh.queueFull = make(chan bool)
-	fh.entryChan = make(chan *core.LogEntry, fh.queueSize)
+	fh.entryC = make(chan *core.LogEntry, fh.queueSize)
 	fh.entryBuf = make([]*core.LogEntry, 0)
 	fh.ticker = time.NewTicker(time.Duration(fh.flushInterval) * time.Millisecond)
 
@@ -430,7 +439,7 @@ func (fh *FileHandler) notifyFull() {
 func (fh *FileHandler) runChan() {
 	for {
 		select {
-		case logEntry := <-fh.entryChan:
+		case logEntry := <-fh.entryC:
 			fh.appendLogEntry(logEntry)
 		case <-fh.ticker.C:
 			fh.handleLogEntry()
@@ -455,12 +464,11 @@ func (fh *FileHandler) handleLogEntry() {
 		return
 	}
 
-	blockSize := 256
-	blocks := utils.CalculateBlocks(len(fh.entryBuf), blockSize)
+	blocks := utils.CalculateBlocks(len(fh.entryBuf), fh.flushSize)
 	for i := 0; i < blocks; i++ {
 		buf := bufferpool.Borrow()
 
-		for j := 0; j < blockSize && i*blocks+j < len(fh.entryBuf); j++ {
+		for j := 0; j < fh.flushSize && i*blocks+j < len(fh.entryBuf); j++ {
 			entry := fh.entryBuf[i*blocks+j]
 			b := fh.formatter.Format(entry)
 			buf.AppendBytes(b.Bytes())

@@ -36,7 +36,7 @@ type Logger interface {
 	Fatal(msg string)
 	WithField(field string, v interface{}) Logger
 	WithError(err error) Logger
-	WithMarker(marker string) Logger
+	WithMarkers(markers ...string) Logger
 }
 
 type Handlers = []handler.Handler
@@ -47,7 +47,7 @@ type LoggerInternal struct {
 	sourceFlag int
 	err        error
 	fields     map[string]interface{}
-	marker     string
+	markers    []string
 }
 
 type DefaultLogger struct {
@@ -136,6 +136,7 @@ func NewLoggerInternal(handlers map[string]*Handlers, level core.Level) *LoggerI
 		handlers:   handlers,
 		fields:     make(map[string]interface{}, 0),
 		sourceFlag: DefaultSkip,
+		markers:    []string{""},
 	}
 
 }
@@ -148,8 +149,8 @@ func (li *LoggerInternal) WithField(field string, v interface{}) Logger {
 	return li
 }
 
-func (li *LoggerInternal) WithMarker(marker string) Logger {
-	li.marker = marker
+func (li *LoggerInternal) WithMarkers(markers ...string) Logger {
+	li.markers = markers
 	return li
 }
 
@@ -187,11 +188,10 @@ func (li *LoggerInternal) finalize(level core.Level, msg string) (entry *core.Lo
 	entry.Time = time.Now()
 	entry.Level = level
 	entry.Msg = msg
-	entry.Marker = li.marker
 	entry.Err = li.err
 	entry.Fields = li.fields
 	if line, funcName, ok := utils.ShortSourceLoc(li.sourceFlag); ok {
-		entry.SrcValid = true
+		entry.UseLoc = true
 		entry.Line = line
 		entry.FuncName = funcName
 	}
@@ -209,14 +209,29 @@ func (li *LoggerInternal) Log(level core.Level, msg string) {
 		if handlers == nil {
 			continue
 		}
-		if marker == li.marker {
+		if li.contains(marker) {
+			e := entry.Copy()
+			e.Marker = marker
+
 			for _, handler := range *handlers {
-				handler.Handle(entry)
+				handler.Handle(e)
 			}
 		}
 	}
 
 	return
+}
+
+func (li *LoggerInternal) contains(marker string) bool {
+	if len(li.markers) == 0 {
+		return false
+	}
+	for _, m := range li.markers {
+		if m == marker {
+			return true
+		}
+	}
+	return false
 }
 
 func (li *LoggerInternal) Enable(level core.Level) bool {
@@ -231,6 +246,7 @@ func (dl *DefaultLogger) newInternal() *LoggerInternal {
 		logLevel:   dl.internal.logLevel,
 		handlers:   dl.internal.handlers,
 		sourceFlag: dl.internal.sourceFlag,
+		markers:    dl.internal.markers,
 		fields:     make(map[string]interface{}),
 	}
 }
@@ -267,6 +283,6 @@ func (dl *DefaultLogger) WithField(field string, v interface{}) Logger {
 	return dl.newInternal().WithField(field, v)
 }
 
-func (dl *DefaultLogger) WithMarker(marker string) Logger {
-	return dl.newInternal().WithMarker(marker)
+func (dl *DefaultLogger) WithMarkers(markers ...string) Logger {
+	return dl.newInternal().WithMarkers(markers...)
 }
