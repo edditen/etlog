@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
+	etlog.Log.Info("start")
 	logger, err := etlog.NewDefaultLogger(etlog.SetConfigPath("example/log.yaml"))
 	if err != nil {
 		log.Fatalf("err: %+v", err)
@@ -56,7 +57,7 @@ func RunRotate() {
 			defer wg.Done()
 			for {
 				etlog.Log.
-					WithMarker("trace").
+					WithMarkers("trace", "data").
 					WithField("key", "word").
 					WithField("index", index).
 					WithField("now", time.Now()).

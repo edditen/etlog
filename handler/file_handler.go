@@ -114,6 +114,9 @@ func (fh *FileHandler) Init() error {
 }
 
 func (fh *FileHandler) Handle(entry *core.LogEntry) error {
+	if !fh.BaseHandler.MarkerMatched(entry.Marker) {
+		return nil
+	}
 	if !fh.BaseHandler.Contains(entry.Level) {
 		return nil
 	}

@@ -19,11 +19,25 @@ type LogEntry struct {
 	Marker   string    `json:"marker"`
 	Err      error     `json:"error"`
 	Fields   Fields    `json:"fields"`
-	SrcValid bool      `json:"-"`
+	UseLoc   bool      `json:"-"`
 }
 
 func NewLogMeta() *LogEntry {
 	return &LogEntry{}
+}
+
+func (le *LogEntry) Copy() *LogEntry {
+	return &LogEntry{
+		Time:     le.Time,
+		Level:    le.Level,
+		Line:     le.Line,
+		FuncName: le.FuncName,
+		Msg:      le.Msg,
+		Marker:   le.Marker,
+		Err:      le.Err,
+		Fields:   le.Fields,
+		UseLoc:   le.UseLoc,
+	}
 }
 
 func (f Fields) String() string {

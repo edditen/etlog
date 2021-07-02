@@ -111,7 +111,7 @@ func (ff *FullFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
 	buf.AppendByte('|')
 
 	// line & func
-	if entry.SrcValid {
+	if entry.UseLoc {
 		buf.AppendString(entry.Line)
 		buf.AppendByte('|')
 		buf.AppendString(entry.FuncName)
