@@ -22,6 +22,9 @@ func (sh *StdHandler) Init() error {
 }
 
 func (sh *StdHandler) Handle(entry *core.LogEntry) error {
+	if !sh.BaseHandler.MarkerMatched(entry.Marker) {
+		return nil
+	}
 	if !sh.BaseHandler.Contains(entry.Level) {
 		return nil
 	}
