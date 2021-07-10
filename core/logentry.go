@@ -22,7 +22,7 @@ type LogEntry struct {
 	UseLoc   bool      `json:"-"`
 }
 
-func NewLogMeta() *LogEntry {
+func NewLogEntry() *LogEntry {
 	return &LogEntry{}
 }
 
