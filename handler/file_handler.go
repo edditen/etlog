@@ -5,8 +5,8 @@ import (
 	"github.com/EdgarTeng/etlog/common/bufferpool"
 	"github.com/EdgarTeng/etlog/handler/archiver"
 	"github.com/EdgarTeng/etlog/handler/cleaner"
+	"github.com/EdgarTeng/etlog/opt"
 	"io/fs"
-	"log"
 	"math"
 	"os"
 	"path"
@@ -115,7 +115,7 @@ func (fh *FileHandler) Init() error {
 	return nil
 }
 
-func (fh *FileHandler) Handle(entry *core.LogEntry) error {
+func (fh *FileHandler) Handle(entry *core.LogEntry) (err error) {
 	if !fh.BaseHandler.MarkerMatched(entry.Marker) {
 		return nil
 	}
@@ -127,10 +127,10 @@ func (fh *FileHandler) Handle(entry *core.LogEntry) error {
 		select {
 		case fh.entryC <- entry:
 		default:
-			fh.syncHandle(entry)
+			err = fh.syncHandle(entry)
 			fh.notifyFull()
 		}
-		return nil
+		return err
 	}
 	return fh.syncHandle(entry)
 }
@@ -240,18 +240,17 @@ func (fh *FileHandler) backup() (string, error) {
 	return backupName, nil
 }
 
-func (fh *FileHandler) postRotate(backupName string) error {
+func (fh *FileHandler) postRotate(backupName string) {
 	// archive
 	if err := fh.archiver.Archive(backupName); err != nil {
-		log.Printf("%+v", err)
+		opt.GetErrLog().Printf("archive files err: %+v\n", err)
 	}
 
 	//clean
 	if err := fh.cleaner.Clean(); err != nil {
-		log.Printf("%+v", err)
+		opt.GetErrLog().Printf("clean backup files err: %+v\n", err)
 	}
 
-	return nil
 }
 
 func (fh *FileHandler) shouldRotate() bool {
@@ -475,7 +474,9 @@ func (fh *FileHandler) handleLogEntry() {
 			b.Free()
 		}
 
-		fh.syncFlush(buf.Bytes())
+		if err := fh.syncFlush(buf.Bytes()); err != nil {
+			opt.GetErrLog().Printf("sync flush log err: %+v\n", err)
+		}
 		buf.Free()
 	}
 

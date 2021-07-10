@@ -2,10 +2,10 @@ package config
 
 import (
 	"fmt"
+	"github.com/EdgarTeng/etlog/opt"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
-	stdlog "log"
 )
 
 var (
@@ -35,16 +35,16 @@ func NewConfig(configPath string) *Config {
 }
 
 func (c *Config) Init() error {
-	stdlog.Println("[Init] init log config, log config:", c.configPath)
+	opt.GetInfoLog().Printf("[Init] init log config, log config:%s\n", c.configPath)
 	yamlFile, err := ioutil.ReadFile(c.configPath)
 	if err != nil {
-		stdlog.Printf("[Init] init log config read config file error: %+v\n", err)
+		opt.GetErrLog().Printf("[Init] init log config read config file error: %+v\n", err)
 		return errors.Wrap(err, fmt.Sprintf("read file %s error", c.configPath))
 	}
 
 	err = yaml.Unmarshal(yamlFile, c.LogConf)
 	if err != nil {
-		stdlog.Printf("[Init] init log config unmarshal config file error: %+v\n", err)
+		opt.GetErrLog().Printf("[Init] init log config unmarshal config file error: %+v\n", err)
 		return errors.Wrap(err, fmt.Sprintf("unmarshal file error"))
 	}
 	return nil

@@ -5,7 +5,7 @@ import (
 	"github.com/EdgarTeng/etlog/config"
 	"github.com/EdgarTeng/etlog/core"
 	"github.com/EdgarTeng/etlog/handler"
-	"log"
+	"github.com/EdgarTeng/etlog/opt"
 	"time"
 )
 
@@ -54,11 +54,27 @@ type DefaultLogger struct {
 	configPath string
 	conf       *config.Config
 	internal   *LoggerInternal
+	errLog     opt.Printfer
+	infoLog    opt.Printfer
 }
 
 func SetConfigPath(configPath string) LoggerOptionFunc {
 	return func(logger *DefaultLogger) error {
 		logger.configPath = configPath
+		return nil
+	}
+}
+
+func SetErrorLog(errLog opt.Printfer) LoggerOptionFunc {
+	return func(logger *DefaultLogger) error {
+		logger.errLog = errLog
+		return nil
+	}
+}
+
+func SetInfoLog(infoLog opt.Printfer) LoggerOptionFunc {
+	return func(logger *DefaultLogger) error {
+		logger.infoLog = infoLog
 		return nil
 	}
 }
@@ -73,6 +89,8 @@ func NewDefaultLogger(options ...LoggerOptionFunc) (*DefaultLogger, error) {
 			return nil, err
 		}
 	}
+
+	logger.setLoggers()
 
 	conf := config.NewConfig(logger.configPath)
 	if err := conf.Init(); err != nil {
@@ -89,6 +107,15 @@ func NewDefaultLogger(options ...LoggerOptionFunc) (*DefaultLogger, error) {
 	return logger, nil
 }
 
+func (dl *DefaultLogger) setLoggers() {
+	if dl.errLog != nil {
+		opt.SetErrLog(opt.NewInternalLog(dl.errLog, 10, 1000))
+	}
+	if dl.infoLog != nil {
+		opt.SetInfoLog(opt.NewInternalLog(dl.infoLog, 100, 1000))
+	}
+}
+
 func newDefaultLogger() *DefaultLogger {
 	logger := &DefaultLogger{
 		configPath: DefaultConfigPath,
@@ -96,7 +123,7 @@ func newDefaultLogger() *DefaultLogger {
 
 	handlers, level, err := getHandlers(config.DefaultConfig)
 	if err != nil {
-		log.Println("new default logger error", err)
+		opt.GetErrLog().Printf("new default logger err:%+v\n", err)
 		return nil
 	}
 
@@ -110,19 +137,19 @@ func getHandlers(conf *config.Config) (map[string]*Handlers, core.Level, error) 
 
 	handlers := make(map[string]*Handlers, 0)
 	for _, handlerConf := range conf.LogConf.Handlers {
-		handler := handler.HandlerFactory(&handlerConf)
-		if err := handler.Init(); err != nil {
+		h := handler.HandlerFactory(&handlerConf)
+		if err := h.Init(); err != nil {
 			return nil, core.DEBUG, err
 		}
 
 		if hs, ok := handlers[handlerConf.Marker]; ok {
 			if hs == nil {
-				hs = &Handlers{handler}
+				hs = &Handlers{h}
 			} else {
-				*hs = append(*hs, handler)
+				*hs = append(*hs, h)
 			}
 		} else {
-			handlers[handlerConf.Marker] = &Handlers{handler}
+			handlers[handlerConf.Marker] = &Handlers{h}
 		}
 
 	}
@@ -213,8 +240,10 @@ func (li *LoggerInternal) Log(level core.Level, msg string) {
 			e := entry.Copy()
 			e.Marker = marker
 
-			for _, handler := range *handlers {
-				handler.Handle(e)
+			for _, h := range *handlers {
+				if err := h.Handle(e); err != nil {
+					opt.GetErrLog().Printf("handle log err: %+v\n", err)
+				}
 			}
 		}
 	}
