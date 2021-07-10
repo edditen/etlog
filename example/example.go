@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/EdgarTeng/etlog/opt"
 	"log"
 	"sync"
 	"time"
@@ -11,8 +12,10 @@ import (
 
 func main() {
 	etlog.Log.Info("start")
-	logger, err := etlog.NewDefaultLogger(
+	logger, err := etlog.NewEtLogger(
 		etlog.SetConfigPath("example/log.yaml"),
+		etlog.SetPreLog(preLog()...),
+		etlog.SetPostLog(postLog()...),
 	)
 	if err != nil {
 		log.Fatalf("err: %+v", err)
@@ -23,6 +26,34 @@ func main() {
 	RunRotate()
 	log.Println("done")
 
+}
+
+func preLog() []opt.LogFunc {
+	fns := make([]opt.LogFunc, 0)
+	fns = append(fns, func(e *opt.LogE) {
+		if e.Level == "ERROR" {
+			log.Printf("received an error at %v, msg: %s, err: %+v, fields: %v\n",
+				e.Time, e.Msg, e.Err, e.Fields)
+		}
+	})
+	return fns
+}
+
+func postLog() []opt.LogFunc {
+	fns := make([]opt.LogFunc, 0)
+	fns = append(fns, func(e *opt.LogE) {
+		if e.Level == "ERROR" {
+			log.Printf("handled an error at %v, msg: %s, err: %+v, fields: %v\n",
+				e.Time, e.Msg, e.Err, e.Fields)
+		}
+	})
+	fns = append(fns, func(e *opt.LogE) {
+		if e.Level == "ERROR" {
+			panic("I'm a panic")
+		}
+	})
+
+	return fns
 }
 
 func RunAll() {
