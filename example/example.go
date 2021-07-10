@@ -11,7 +11,9 @@ import (
 
 func main() {
 	etlog.Log.Info("start")
-	logger, err := etlog.NewDefaultLogger(etlog.SetConfigPath("example/log.yaml"))
+	logger, err := etlog.NewDefaultLogger(
+		etlog.SetConfigPath("example/log.yaml"),
+	)
 	if err != nil {
 		log.Fatalf("err: %+v", err)
 	}

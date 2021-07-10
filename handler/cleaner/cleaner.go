@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/EdgarTeng/etlog/common/runnable"
 	"github.com/EdgarTeng/etlog/common/utils"
+	"github.com/EdgarTeng/etlog/opt"
 	"github.com/pkg/errors"
-	"log"
 	"math"
 	"os"
 	"path"
@@ -21,8 +21,6 @@ var (
 	defaultBackupExt      = ".zip"
 	defaultBackupCount    = math.MaxInt32
 	defaultBackupDuration = 100 * 365 * 24 * time.Hour //100 years
-	defaultBackupDir      = "log"
-	defaultBackupBaseName = "etlog"
 	defaultCheckInterval  = 10 * time.Minute
 	defaultTimeFormat     = "2006-01-02.150405"
 	defaultTimePattern    = regexp.MustCompile(".*([\\d]{4}-[\\d]{2}-[\\d]{2}\\.[\\d]{6}).*")
@@ -70,8 +68,8 @@ func NewLogCleaner(backupDir, backupBaseName string, options ...Option) (*LogCle
 		exitC:          make(chan interface{}),
 	}
 
-	for _, opt := range options {
-		if err := opt(fc); err != nil {
+	for _, option := range options {
+		if err := option(fc); err != nil {
 			return nil, err
 		}
 	}
@@ -193,7 +191,7 @@ func (lc *LogCleaner) listBackupFiles() []FileInfo {
 			return nil
 		})
 	if err != nil {
-		log.Println(err)
+		opt.GetErrLog().Printf("list backup files err: %+v\n", err)
 	}
 
 	return matchedFiles

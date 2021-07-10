@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/EdgarTeng/etlog/common/utils"
-	"log"
+	"github.com/EdgarTeng/etlog/opt"
 	"time"
 )
 
@@ -50,7 +50,7 @@ func (f Fields) Bytes() []byte {
 	}
 	builder := &bytes.Buffer{}
 	if err := json.NewEncoder(builder).Encode(f); err != nil {
-		log.Println(err.Error())
+		opt.GetErrLog().Printf("json encode builder err: %+v\n", err)
 		return []byte{}
 	}
 	return utils.TrimBytes(builder.Bytes())
