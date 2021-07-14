@@ -37,11 +37,12 @@ type Logger interface {
 	WithField(field string, v interface{}) Logger
 	WithError(err error) Logger
 	WithMarkers(markers ...string) Logger
+	Enable(level core.Level) bool
 }
 
 type Handlers = []handler.Handler
 
-type loggerInternal struct {
+type internalLogger struct {
 	logLevel   core.Level
 	handlers   map[string]*Handlers
 	sourceFlag int
@@ -55,7 +56,7 @@ type loggerInternal struct {
 type EtLogger struct {
 	configPath string
 	conf       *config.Config
-	internal   *loggerInternal
+	internal   *internalLogger
 	errLog     opt.Printfer
 	infoLog    opt.Printfer
 	preFns     []opt.LogFunc
@@ -126,12 +127,12 @@ func NewEtLogger(options ...LoggerOptionFunc) (*EtLogger, error) {
 	return logger, nil
 }
 
-func (dl *EtLogger) setLoggers() {
-	if dl.errLog != nil {
-		opt.SetErrLog(opt.NewInternalLog(dl.errLog, 10, 1000))
+func (el *EtLogger) setLoggers() {
+	if el.errLog != nil {
+		opt.SetErrLog(opt.NewInternalLog(el.errLog, 10, 1000))
 	}
-	if dl.infoLog != nil {
-		opt.SetInfoLog(opt.NewInternalLog(dl.infoLog, 100, 1000))
+	if el.infoLog != nil {
+		opt.SetInfoLog(opt.NewInternalLog(el.infoLog, 100, 1000))
 	}
 }
 
@@ -178,8 +179,8 @@ func getHandlers(conf *config.Config) (map[string]*Handlers, core.Level, error) 
 
 }
 
-func newLoggerInternal(handlers map[string]*Handlers, level core.Level) *loggerInternal {
-	return &loggerInternal{
+func newLoggerInternal(handlers map[string]*Handlers, level core.Level) *internalLogger {
+	return &internalLogger{
 		logLevel:   level,
 		handlers:   handlers,
 		fields:     make(map[string]interface{}, 0),
@@ -191,56 +192,56 @@ func newLoggerInternal(handlers map[string]*Handlers, level core.Level) *loggerI
 
 }
 
-func (li *loggerInternal) WithField(field string, v interface{}) Logger {
-	if li.fields == nil {
-		li.fields = make(map[string]interface{}, 0)
+func (il *internalLogger) WithField(field string, v interface{}) Logger {
+	if il.fields == nil {
+		il.fields = make(map[string]interface{}, 0)
 	}
-	li.fields[field] = v
-	return li
+	il.fields[field] = v
+	return il
 }
 
-func (li *loggerInternal) WithMarkers(markers ...string) Logger {
-	li.markers = markers
-	return li
+func (il *internalLogger) WithMarkers(markers ...string) Logger {
+	il.markers = markers
+	return il
 }
 
-func (li *loggerInternal) WithError(err error) Logger {
-	li.err = err
-	return li
+func (il *internalLogger) WithError(err error) Logger {
+	il.err = err
+	return il
 }
 
-func (li *loggerInternal) Debug(msg string) {
-	li.Log(core.DEBUG, msg)
+func (il *internalLogger) Debug(msg string) {
+	il.Log(core.DEBUG, msg)
 }
 
-func (li *loggerInternal) Info(msg string) {
-	li.Log(core.INFO, msg)
+func (il *internalLogger) Info(msg string) {
+	il.Log(core.INFO, msg)
 }
 
-func (li *loggerInternal) Data(msg string) {
-	li.Log(core.DATA, msg)
+func (il *internalLogger) Data(msg string) {
+	il.Log(core.DATA, msg)
 }
 
-func (li *loggerInternal) Warn(msg string) {
-	li.Log(core.WARN, msg)
+func (il *internalLogger) Warn(msg string) {
+	il.Log(core.WARN, msg)
 }
 
-func (li *loggerInternal) Error(msg string) {
-	li.Log(core.ERROR, msg)
+func (il *internalLogger) Error(msg string) {
+	il.Log(core.ERROR, msg)
 }
 
-func (li *loggerInternal) Fatal(msg string) {
-	li.Log(core.FATAL, msg)
+func (il *internalLogger) Fatal(msg string) {
+	il.Log(core.FATAL, msg)
 }
 
-func (li *loggerInternal) finalize(level core.Level, msg string) (entry *core.LogEntry) {
+func (il *internalLogger) finalize(level core.Level, msg string) (entry *core.LogEntry) {
 	entry = core.NewLogEntry()
 	entry.Time = time.Now()
 	entry.Level = level
 	entry.Msg = msg
-	entry.Err = li.err
-	entry.Fields = li.fields
-	if line, funcName, ok := utils.ShortSourceLoc(li.sourceFlag); ok {
+	entry.Err = il.err
+	entry.Fields = il.fields
+	if line, funcName, ok := utils.ShortSourceLoc(il.sourceFlag); ok {
 		entry.UseLoc = true
 		entry.Line = line
 		entry.FuncName = funcName
@@ -249,21 +250,21 @@ func (li *loggerInternal) finalize(level core.Level, msg string) (entry *core.Lo
 	return entry
 }
 
-func (li *loggerInternal) Log(level core.Level, msg string) {
-	if !li.Enable(level) {
+func (il *internalLogger) Log(level core.Level, msg string) {
+	if !il.Enable(level) {
 		return
 	}
-	entry := li.finalize(level, msg)
+	entry := il.finalize(level, msg)
 
-	for marker, handlers := range li.handlers {
-		if handlers == nil || !li.contains(marker) {
+	for marker, handlers := range il.handlers {
+		if handlers == nil || !il.contains(marker) {
 			continue
 		}
 
 		e := entry.Copy()
 		e.Marker = marker
 
-		li.preHandle(e)
+		il.preHandle(e)
 
 		for _, h := range *handlers {
 			if err := h.Handle(e); err != nil {
@@ -271,31 +272,31 @@ func (li *loggerInternal) Log(level core.Level, msg string) {
 			}
 		}
 
-		li.postHandle(e)
+		il.postHandle(e)
 	}
 
 	return
 }
 
-func (li *loggerInternal) preHandle(entry *core.LogEntry) {
-	if len(li.preFns) == 0 {
+func (il *internalLogger) preHandle(entry *core.LogEntry) {
+	if len(il.preFns) == 0 {
 		return
 	}
 
 	e := newLogE(entry)
-	for _, fn := range li.preFns {
+	for _, fn := range il.preFns {
 		handleFunc(fn, e)
 	}
 
 }
 
-func (li *loggerInternal) postHandle(entry *core.LogEntry) {
-	if len(li.postFns) == 0 {
+func (il *internalLogger) postHandle(entry *core.LogEntry) {
+	if len(il.postFns) == 0 {
 		return
 	}
 
 	e := newLogE(entry)
-	for _, fn := range li.postFns {
+	for _, fn := range il.postFns {
 		handleFunc(fn, e)
 	}
 }
@@ -320,11 +321,11 @@ func handleFunc(fn opt.LogFunc, e *opt.LogE) {
 	fn(e)
 }
 
-func (li *loggerInternal) contains(marker string) bool {
-	if len(li.markers) == 0 {
+func (il *internalLogger) contains(marker string) bool {
+	if len(il.markers) == 0 {
 		return false
 	}
-	for _, m := range li.markers {
+	for _, m := range il.markers {
 		if m == marker {
 			return true
 		}
@@ -332,62 +333,66 @@ func (li *loggerInternal) contains(marker string) bool {
 	return false
 }
 
-func (li *loggerInternal) Enable(level core.Level) bool {
-	if level < li.logLevel {
+func (il *internalLogger) Enable(level core.Level) bool {
+	if level < il.logLevel {
 		return false
 	}
 	return true
 }
 
-func (li *loggerInternal) setLogFunc(preFns, postFns []opt.LogFunc) {
-	li.preFns = preFns
-	li.postFns = postFns
+func (il *internalLogger) setLogFunc(preFns, postFns []opt.LogFunc) {
+	il.preFns = preFns
+	il.postFns = postFns
 }
 
-func (dl *EtLogger) newInternal() *loggerInternal {
-	return &loggerInternal{
-		logLevel:   dl.internal.logLevel,
-		handlers:   dl.internal.handlers,
-		sourceFlag: dl.internal.sourceFlag,
-		markers:    dl.internal.markers,
+func (el *EtLogger) newInternal() *internalLogger {
+	return &internalLogger{
+		logLevel:   el.internal.logLevel,
+		handlers:   el.internal.handlers,
+		sourceFlag: el.internal.sourceFlag,
+		markers:    el.internal.markers,
 		fields:     make(map[string]interface{}),
-		preFns:     dl.preFns,
-		postFns:    dl.postFns,
+		preFns:     el.preFns,
+		postFns:    el.postFns,
 	}
 }
 
-func (dl *EtLogger) Debug(msg string) {
-	dl.internal.Log(core.DEBUG, msg)
+func (el *EtLogger) Debug(msg string) {
+	el.internal.Log(core.DEBUG, msg)
 }
 
-func (dl *EtLogger) Info(msg string) {
-	dl.internal.Log(core.INFO, msg)
+func (el *EtLogger) Info(msg string) {
+	el.internal.Log(core.INFO, msg)
 }
 
-func (dl *EtLogger) Data(msg string) {
-	dl.internal.Log(core.DATA, msg)
+func (el *EtLogger) Data(msg string) {
+	el.internal.Log(core.DATA, msg)
 }
 
-func (dl *EtLogger) Warn(msg string) {
-	dl.internal.Log(core.WARN, msg)
+func (el *EtLogger) Warn(msg string) {
+	el.internal.Log(core.WARN, msg)
 }
 
-func (dl *EtLogger) Error(msg string) {
-	dl.internal.Log(core.ERROR, msg)
+func (el *EtLogger) Error(msg string) {
+	el.internal.Log(core.ERROR, msg)
 }
 
-func (dl *EtLogger) Fatal(msg string) {
-	dl.internal.Log(core.FATAL, msg)
+func (el *EtLogger) Fatal(msg string) {
+	el.internal.Log(core.FATAL, msg)
 }
 
-func (dl *EtLogger) WithError(err error) Logger {
-	return dl.newInternal().WithError(err)
+func (el *EtLogger) WithError(err error) Logger {
+	return el.newInternal().WithError(err)
 }
 
-func (dl *EtLogger) WithField(field string, v interface{}) Logger {
-	return dl.newInternal().WithField(field, v)
+func (el *EtLogger) WithField(field string, v interface{}) Logger {
+	return el.newInternal().WithField(field, v)
 }
 
-func (dl *EtLogger) WithMarkers(markers ...string) Logger {
-	return dl.newInternal().WithMarkers(markers...)
+func (el *EtLogger) WithMarkers(markers ...string) Logger {
+	return el.newInternal().WithMarkers(markers...)
+}
+
+func (el *EtLogger) Enable(level core.Level) bool {
+	return el.internal.Enable(level)
 }
