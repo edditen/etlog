@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/EdgarTeng/etlog/core"
 	"github.com/EdgarTeng/etlog/opt"
 	"log"
 	"sync"
@@ -58,12 +59,18 @@ func postLog() []opt.LogFunc {
 
 func RunAll() {
 	etlog.Log.Debug("hello")
-	etlog.Log.Info("hello")
 	etlog.Log.Info("world")
 	etlog.Log.Data("hello")
 	etlog.Log.Warn("world")
 	etlog.Log.Error("world")
 	etlog.Log.Fatal("world")
+	fmt.Println("DEBUG enable", etlog.Log.Enable(core.DEBUG))
+	fmt.Println("INFO enable", etlog.Log.Enable(core.INFO))
+	fmt.Println("DATA enable", etlog.Log.Enable(core.DATA))
+	fmt.Println("WARN enable", etlog.Log.Enable(core.WARN))
+	fmt.Println("ERROR enable", etlog.Log.Enable(core.ERROR))
+	fmt.Println("FATAL enable", etlog.Log.Enable(core.FATAL))
+
 	etlog.Log.WithError(fmt.Errorf("oops")).
 		WithField("key", "word").
 		WithField("now", time.Now()).
