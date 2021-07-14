@@ -1,5 +1,4 @@
 level: debug
-name: default
 handlers:
   - type: std
     levels:
@@ -29,9 +28,6 @@ handlers:
       queue_size: 8192
     message:
       format: full
-      fields_format: JSON
-      max_bytes: 8192
-      meta_option: All
 
   - type: file
     marker: trace
@@ -50,9 +46,6 @@ handlers:
       queue_size: 8192
     message:
       format: full
-      fields_format: JSON
-      max_bytes: 8192
-      meta_option: All
 
   - type: file
     marker: data
@@ -71,6 +64,3 @@ handlers:
       queue_size: 8192
     message:
       format: full
-      fields_format: JSON
-      max_bytes: 8192
-      meta_option: All

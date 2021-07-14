@@ -19,7 +19,6 @@ func init() {
 	handlerConfig.Message.Format = "simple"
 	DefaultConfig.LogConf.Handlers = append(DefaultConfig.LogConf.Handlers, *handlerConfig)
 	DefaultConfig.LogConf.Level = "debug"
-	DefaultConfig.LogConf.Name = "default"
 }
 
 type Config struct {
@@ -53,7 +52,6 @@ func (c *Config) Init() error {
 type LogConfig struct {
 	Handlers []HandlerConfig `yaml:"handlers"`
 	Level    string          `yaml:"level"`
-	Name     string          `yaml:"name"`
 }
 
 func NewLogConfig() *LogConfig {
@@ -103,10 +101,7 @@ func NewSyncConfig() *SyncConfig {
 }
 
 type MessageConfig struct {
-	Format       string `yaml:"format"`
-	FieldsFormat string `yaml:"fields_format"`
-	MaxBytes     string `yaml:"max_bytes"`
-	MetaOption   string `yaml:"meta_option"`
+	Format string `yaml:"format"`
 }
 
 func NewMessageConfig() *MessageConfig {
