@@ -25,6 +25,7 @@ func main() {
 
 	RunAll()
 	RunRotate()
+	time.Sleep(10 * time.Second)
 	log.Println("done")
 
 }
@@ -75,6 +76,15 @@ func RunAll() {
 		WithField("key", "word").
 		WithField("now", time.Now()).
 		Error("something wrong happened")
+	etlog.Log.WithError(fmt.Errorf("oops")).
+		WithField("key", "word").
+		WithField("now", time.Now()).
+		Error("something wrong happened")
+	etlog.Log.WithFields(core.Fields{
+		"abc": 123,
+		"xyz": "hello world",
+		"now": time.Now(),
+	}).Info("test fields")
 
 	for i := 1; i < 10; i++ {
 		etlog.Log.WithError(fmt.Errorf("oops")).
@@ -111,6 +121,5 @@ func RunRotate() {
 	}
 	wg.Wait()
 	etlog.Log.WithField("endTime", time.Now()).Info("complete test")
-	time.Sleep(10 * time.Second)
 
 }

@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"fmt"
 	"runtime"
 )
 
@@ -17,14 +16,13 @@ func SourceLoc(skip int) (file string, line int, funcName string, ok bool) {
 	return
 }
 
-func ShortSourceLoc(skip int) (line string, funcName string, ok bool) {
+func ShortSourceLoc(skip int) (fileName string, line int, funcName string, ok bool) {
 	var _file string
-	var _line int
 	var _funcName string
-	if _file, _line, _funcName, ok = SourceLoc(skip); !ok {
-		return "", "", false
+	if _file, line, _funcName, ok = SourceLoc(skip); !ok {
+		return "", 0, "", false
 	}
-	line = LastSubstring(fmt.Sprintf("%s:%d", _file, _line), "/")
+	fileName = LastSubstring(_file, "/")
 	funcName = LastSubstring(_funcName, "/")
 	return
 }

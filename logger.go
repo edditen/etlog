@@ -6,26 +6,52 @@ import (
 	"github.com/EdgarTeng/etlog/core"
 	"github.com/EdgarTeng/etlog/handler"
 	"github.com/EdgarTeng/etlog/opt"
+	"log"
+	"os"
 	"time"
 )
 
 const (
 	DefaultConfigPath = "log.yaml"
-	DefaultSkip       = 5
+	BaseSkip          = 5
+)
+
+var (
+	defaultErr = func() error {
+		return nil
+	}
+	defaultFields = func() core.Fields {
+		return core.Fields{}
+	}
+	defaultMarkers = func() []string {
+		return []string{""}
+	}
+
+	defaultLogger = func() *EtLogger {
+		return &EtLogger{
+			configPath: DefaultConfigPath,
+			logLevel:   core.DEBUG,
+			errLog:     log.New(os.Stderr, "error:", log.LstdFlags),
+			infoLog:    log.New(os.Stdout, "", log.LstdFlags),
+			sourceSkip: getSourceSkip(0),
+			preFns:     make([]opt.LogFunc, 0),
+			postFns:    make([]opt.LogFunc, 0),
+			conf:       config.DefaultConfig,
+		}
+	}
 )
 
 var Log Logger
 
 func init() {
-	log := newEtLogger()
-	Log = log
+	SetDefaultLog(newEtLogger())
 }
 
-func SetDefaultLog(log Logger) {
-	Log = log
+func SetDefaultLog(l Logger) {
+	Log = l
 }
 
-type LoggerOptionFunc func(logger *EtLogger) error
+type OptionFunc func(logger *EtLogger) error
 
 type Logger interface {
 	Debug(msg string)
@@ -35,6 +61,7 @@ type Logger interface {
 	Error(msg string)
 	Fatal(msg string)
 	WithField(field string, v interface{}) Logger
+	WithFields(fields core.Fields) Logger
 	WithError(err error) Logger
 	WithMarkers(markers ...string) Logger
 	Enable(level core.Level) bool
@@ -43,65 +70,73 @@ type Logger interface {
 type Handlers = []handler.Handler
 
 type internalLogger struct {
-	logLevel   core.Level
-	handlers   map[string]*Handlers
-	sourceFlag int
-	err        error
-	fields     map[string]interface{}
-	markers    []string
-	preFns     []opt.LogFunc
-	postFns    []opt.LogFunc
+	err      error
+	fields   core.Fields
+	markers  []string
+	etLogger *EtLogger
 }
 
 type EtLogger struct {
 	configPath string
-	conf       *config.Config
-	internal   *internalLogger
+	logLevel   core.Level
 	errLog     opt.Printfer
 	infoLog    opt.Printfer
+	sourceSkip int
 	preFns     []opt.LogFunc
 	postFns    []opt.LogFunc
+	conf       *config.Config
+	handlers   map[string]*Handlers
+	internal   *internalLogger
 }
 
-func SetConfigPath(configPath string) LoggerOptionFunc {
+func SetConfigPath(configPath string) OptionFunc {
 	return func(logger *EtLogger) error {
 		logger.configPath = configPath
 		return nil
 	}
 }
 
-func SetErrorLog(errLog opt.Printfer) LoggerOptionFunc {
+func SetErrorLog(errLog opt.Printfer) OptionFunc {
 	return func(logger *EtLogger) error {
 		logger.errLog = errLog
 		return nil
 	}
 }
 
-func SetInfoLog(infoLog opt.Printfer) LoggerOptionFunc {
+func SetInfoLog(infoLog opt.Printfer) OptionFunc {
 	return func(logger *EtLogger) error {
 		logger.infoLog = infoLog
 		return nil
 	}
 }
 
-func SetPreLog(preLog ...opt.LogFunc) LoggerOptionFunc {
+func SetPreLog(preLog ...opt.LogFunc) OptionFunc {
 	return func(logger *EtLogger) error {
 		logger.preFns = preLog
 		return nil
 	}
 }
 
-func SetPostLog(postLog ...opt.LogFunc) LoggerOptionFunc {
+func SetSourceSkip(skip uint) OptionFunc {
+	return func(logger *EtLogger) error {
+		logger.sourceSkip = getSourceSkip(int(skip))
+		return nil
+	}
+}
+
+func getSourceSkip(skip int) int {
+	return BaseSkip + skip
+}
+
+func SetPostLog(postLog ...opt.LogFunc) OptionFunc {
 	return func(logger *EtLogger) error {
 		logger.postFns = postLog
 		return nil
 	}
 }
 
-func NewEtLogger(options ...LoggerOptionFunc) (*EtLogger, error) {
-	logger := &EtLogger{
-		configPath: DefaultConfigPath,
-	}
+func NewEtLogger(options ...OptionFunc) (*EtLogger, error) {
+	logger := defaultLogger()
 
 	for _, option := range options {
 		if err := option(logger); err != nil {
@@ -109,25 +144,41 @@ func NewEtLogger(options ...LoggerOptionFunc) (*EtLogger, error) {
 		}
 	}
 
-	logger.setLoggers()
-
-	conf := config.NewConfig(logger.configPath)
-	if err := conf.Init(); err != nil {
+	logger.initInternalLogs()
+	logger.conf = config.NewConfig(logger.configPath)
+	if err := logger.conf.Init(); err != nil {
 		return nil, err
 	}
 
-	handlers, level, err := getHandlers(conf)
-	if err != nil {
+	if err := logger.init(); err != nil {
 		return nil, err
 	}
-
-	logger.internal = newLoggerInternal(handlers, level)
-	logger.internal.setLogFunc(logger.preFns, logger.postFns)
 
 	return logger, nil
 }
 
-func (el *EtLogger) setLoggers() {
+func newEtLogger() *EtLogger {
+	logger := defaultLogger()
+	logger.initInternalLogs()
+	if err := logger.init(); err != nil {
+		opt.GetErrLog().Printf("init default etlog err: %+v", err)
+		return nil
+	}
+
+	return logger
+}
+
+func (el *EtLogger) init() (err error) {
+	if el.handlers, err = initHandlers(el.conf); err != nil {
+		return err
+	}
+	el.logLevel = core.NewLevel(el.conf.LogConf.Level)
+	el.internal = newInternalLogger(el)
+
+	return nil
+}
+
+func (el *EtLogger) initInternalLogs() {
 	if el.errLog != nil {
 		opt.SetErrLog(opt.NewInternalLog(el.errLog, 10, 1000))
 	}
@@ -136,32 +187,12 @@ func (el *EtLogger) setLoggers() {
 	}
 }
 
-func newEtLogger() *EtLogger {
-	logger := &EtLogger{
-		configPath: DefaultConfigPath,
-	}
-
-	handlers, level, err := getHandlers(config.DefaultConfig)
-	if err != nil {
-		opt.GetErrLog().Printf("new default logger err:%+v\n", err)
-		return nil
-	}
-
-	logger.setLoggers()
-
-	logger.internal = newLoggerInternal(handlers, level)
-
-	return logger
-}
-
-func getHandlers(conf *config.Config) (map[string]*Handlers, core.Level, error) {
-	level := core.NewLevel(conf.LogConf.Level)
-
+func initHandlers(conf *config.Config) (map[string]*Handlers, error) {
 	handlers := make(map[string]*Handlers, 0)
 	for _, handlerConf := range conf.LogConf.Handlers {
 		h := handler.HandlerFactory(&handlerConf)
 		if err := h.Init(); err != nil {
-			return nil, core.DEBUG, err
+			return nil, err
 		}
 
 		if hs, ok := handlers[handlerConf.Marker]; ok {
@@ -175,32 +206,36 @@ func getHandlers(conf *config.Config) (map[string]*Handlers, core.Level, error) 
 		}
 
 	}
-	return handlers, level, nil
+	return handlers, nil
 
 }
 
-func newLoggerInternal(handlers map[string]*Handlers, level core.Level) *internalLogger {
+func newInternalLogger(etLogger *EtLogger) *internalLogger {
 	return &internalLogger{
-		logLevel:   level,
-		handlers:   handlers,
-		fields:     make(map[string]interface{}, 0),
-		sourceFlag: DefaultSkip,
-		markers:    []string{""},
-		preFns:     make([]opt.LogFunc, 0),
-		postFns:    make([]opt.LogFunc, 0),
+		err:      defaultErr(),
+		fields:   defaultFields(),
+		markers:  defaultMarkers(),
+		etLogger: etLogger,
 	}
 
 }
 
 func (il *internalLogger) WithField(field string, v interface{}) Logger {
-	if il.fields == nil {
-		il.fields = make(map[string]interface{}, 0)
-	}
 	il.fields[field] = v
 	return il
 }
 
+func (il *internalLogger) WithFields(fields core.Fields) Logger {
+	for k, v := range fields {
+		il.fields[k] = v
+	}
+	return il
+}
+
 func (il *internalLogger) WithMarkers(markers ...string) Logger {
+	if len(markers) == 0 {
+		return il
+	}
 	il.markers = markers
 	return il
 }
@@ -241,8 +276,9 @@ func (il *internalLogger) finalize(level core.Level, msg string) (entry *core.Lo
 	entry.Msg = msg
 	entry.Err = il.err
 	entry.Fields = il.fields
-	if line, funcName, ok := utils.ShortSourceLoc(il.sourceFlag); ok {
+	if fname, line, funcName, ok := utils.ShortSourceLoc(il.etLogger.sourceSkip); ok {
 		entry.UseLoc = true
+		entry.FileName = fname
 		entry.Line = line
 		entry.FuncName = funcName
 	}
@@ -256,7 +292,7 @@ func (il *internalLogger) Log(level core.Level, msg string) {
 	}
 	entry := il.finalize(level, msg)
 
-	for marker, handlers := range il.handlers {
+	for marker, handlers := range il.etLogger.handlers {
 		if handlers == nil || !il.contains(marker) {
 			continue
 		}
@@ -275,40 +311,51 @@ func (il *internalLogger) Log(level core.Level, msg string) {
 		il.postHandle(e)
 	}
 
+	il.clean()
+
 	return
 }
 
+func (il *internalLogger) clean() {
+	il.err = defaultErr()
+	il.fields = defaultFields()
+	il.markers = defaultMarkers()
+}
+
 func (il *internalLogger) preHandle(entry *core.LogEntry) {
-	if len(il.preFns) == 0 {
+	if len(il.etLogger.preFns) == 0 {
 		return
 	}
 
 	e := newLogE(entry)
-	for _, fn := range il.preFns {
+	for _, fn := range il.etLogger.preFns {
 		handleFunc(fn, e)
 	}
 
 }
 
 func (il *internalLogger) postHandle(entry *core.LogEntry) {
-	if len(il.postFns) == 0 {
+	if len(il.etLogger.postFns) == 0 {
 		return
 	}
 
 	e := newLogE(entry)
-	for _, fn := range il.postFns {
+	for _, fn := range il.etLogger.postFns {
 		handleFunc(fn, e)
 	}
 }
 
 func newLogE(entry *core.LogEntry) *opt.LogE {
 	return &opt.LogE{
-		Time:   entry.Time,
-		Level:  entry.Level.String(),
-		Marker: entry.Marker,
-		Msg:    entry.Msg,
-		Err:    entry.Err,
-		Fields: entry.Fields,
+		Time:     entry.Time,
+		Level:    entry.Level.String(),
+		FileName: entry.FileName,
+		Line:     entry.Line,
+		FuncName: entry.FuncName,
+		Marker:   entry.Marker,
+		Msg:      entry.Msg,
+		Err:      entry.Err,
+		Fields:   entry.Fields,
 	}
 }
 
@@ -322,9 +369,6 @@ func handleFunc(fn opt.LogFunc, e *opt.LogE) {
 }
 
 func (il *internalLogger) contains(marker string) bool {
-	if len(il.markers) == 0 {
-		return false
-	}
 	for _, m := range il.markers {
 		if m == marker {
 			return true
@@ -334,27 +378,7 @@ func (il *internalLogger) contains(marker string) bool {
 }
 
 func (il *internalLogger) Enable(level core.Level) bool {
-	if level < il.logLevel {
-		return false
-	}
-	return true
-}
-
-func (il *internalLogger) setLogFunc(preFns, postFns []opt.LogFunc) {
-	il.preFns = preFns
-	il.postFns = postFns
-}
-
-func (el *EtLogger) newInternal() *internalLogger {
-	return &internalLogger{
-		logLevel:   el.internal.logLevel,
-		handlers:   el.internal.handlers,
-		sourceFlag: el.internal.sourceFlag,
-		markers:    el.internal.markers,
-		fields:     make(map[string]interface{}),
-		preFns:     el.preFns,
-		postFns:    el.postFns,
-	}
+	return il.etLogger.Enable(level)
 }
 
 func (el *EtLogger) Debug(msg string) {
@@ -382,17 +406,24 @@ func (el *EtLogger) Fatal(msg string) {
 }
 
 func (el *EtLogger) WithError(err error) Logger {
-	return el.newInternal().WithError(err)
+	return newInternalLogger(el).WithError(err)
 }
 
 func (el *EtLogger) WithField(field string, v interface{}) Logger {
-	return el.newInternal().WithField(field, v)
+	return newInternalLogger(el).WithField(field, v)
+}
+
+func (el *EtLogger) WithFields(fields core.Fields) Logger {
+	return newInternalLogger(el).WithFields(fields)
 }
 
 func (el *EtLogger) WithMarkers(markers ...string) Logger {
-	return el.newInternal().WithMarkers(markers...)
+	return newInternalLogger(el).WithMarkers(markers...)
 }
 
 func (el *EtLogger) Enable(level core.Level) bool {
-	return el.internal.Enable(level)
+	if level < el.logLevel {
+		return false
+	}
+	return true
 }

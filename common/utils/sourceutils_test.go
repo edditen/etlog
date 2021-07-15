@@ -8,7 +8,8 @@ func TestShortSourceLoc(t *testing.T) {
 	}
 	type testCase struct {
 		args         args
-		wantLine     string
+		wantFileName string
+		wantLine     int
 		wantFuncName string
 		wantOk       bool
 	}
@@ -19,14 +20,20 @@ func TestShortSourceLoc(t *testing.T) {
 				skip: 0,
 			},
 			wantOk:       true,
-			wantLine:     "sourceutils.go:13",
+			wantFileName: "sourceutils.go",
+			wantLine:     12,
 			wantFuncName: "utils.SourceLoc",
 		}
-		gotLine, gotFuncName, gotOk := ShortSourceLoc(tc.args.skip)
-		t.Log(gotLine, gotFuncName, gotOk)
+		gotFileName, gotLine, gotFuncName, gotOk := ShortSourceLoc(tc.args.skip)
+		t.Log(gotFileName, gotLine, gotFuncName, gotOk)
+		if gotFileName != tc.wantFileName {
+			t.Errorf("ShortSourceLoc() gotFileName = %v, want %v", gotLine, tc.wantLine)
+		}
+
 		if gotLine != tc.wantLine {
 			t.Errorf("ShortSourceLoc() gotLine = %v, want %v", gotLine, tc.wantLine)
 		}
+
 		if gotFuncName != tc.wantFuncName {
 			t.Errorf("ShortSourceLoc() gotFuncName = %v, want %v", gotFuncName, tc.wantFuncName)
 		}
@@ -41,11 +48,16 @@ func TestShortSourceLoc(t *testing.T) {
 				skip: 1,
 			},
 			wantOk:       true,
-			wantLine:     "sourceutils.go:24",
+			wantFileName: "sourceutils.go",
+			wantLine:     22,
 			wantFuncName: "utils.ShortSourceLoc",
 		}
-		gotLine, gotFuncName, gotOk := ShortSourceLoc(tc.args.skip)
-		t.Log(gotLine, gotFuncName, gotOk)
+		gotFileName, gotLine, gotFuncName, gotOk := ShortSourceLoc(tc.args.skip)
+		t.Log(gotFileName, gotLine, gotFuncName, gotOk)
+		if gotFileName != tc.wantFileName {
+			t.Errorf("ShortSourceLoc() gotFileName = %v, want %v", gotLine, tc.wantLine)
+		}
+
 		if gotLine != tc.wantLine {
 			t.Errorf("ShortSourceLoc() gotLine = %v, want %v", gotLine, tc.wantLine)
 		}
@@ -63,11 +75,16 @@ func TestShortSourceLoc(t *testing.T) {
 				skip: 2,
 			},
 			wantOk:       true,
-			wantLine:     "sourceutils_test.go:69",
+			wantFileName: "sourceutils_test.go",
+			wantLine:     82,
 			wantFuncName: "utils.TestShortSourceLoc.func3",
 		}
-		gotLine, gotFuncName, gotOk := ShortSourceLoc(tc.args.skip)
-		t.Log(gotLine, gotFuncName, gotOk)
+		gotFileName, gotLine, gotFuncName, gotOk := ShortSourceLoc(tc.args.skip)
+		t.Log(gotFileName, gotLine, gotFuncName, gotOk)
+		if gotFileName != tc.wantFileName {
+			t.Errorf("ShortSourceLoc() gotFileName = %v, want %v", gotLine, tc.wantLine)
+		}
+
 		if gotLine != tc.wantLine {
 			t.Errorf("ShortSourceLoc() gotLine = %v, want %v", gotLine, tc.wantLine)
 		}
@@ -85,13 +102,16 @@ func TestShortSourceLoc(t *testing.T) {
 				skip: 2,
 			},
 			wantOk:       true,
-			wantLine:     "sourceutils_test.go:92",
-			wantFuncName: "utils.TestShortSourceLoc.func4.1",
+			wantFileName: "sourceutils_test.go",
+			wantLine:     109,
+			wantFuncName: "utils.TestShortSourceLoc.func4",
 		}
-		gotLine, gotFuncName, gotOk := func() (string, string, bool) {
-			return ShortSourceLoc(tc.args.skip)
-		}()
-		t.Log(gotLine, gotFuncName, gotOk)
+		gotFileName, gotLine, gotFuncName, gotOk := ShortSourceLoc(tc.args.skip)
+		t.Log(gotFileName, gotLine, gotFuncName, gotOk)
+		if gotFileName != tc.wantFileName {
+			t.Errorf("ShortSourceLoc() gotFileName = %v, want %v", gotLine, tc.wantLine)
+		}
+
 		if gotLine != tc.wantLine {
 			t.Errorf("ShortSourceLoc() gotLine = %v, want %v", gotLine, tc.wantLine)
 		}
