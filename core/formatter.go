@@ -6,7 +6,6 @@ import (
 	"github.com/EdgarTeng/etlog/common/bufferpool"
 	"github.com/EdgarTeng/etlog/opt"
 	"strings"
-	"time"
 )
 
 type Format int
@@ -73,7 +72,7 @@ func NewSimpleFormatter() *SimpleFormatter {
 func (sf *SimpleFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
 	buf := bufferpool.Borrow()
 	// timestamp
-	buf.AppendString(time.Unix(0, entry.Time).Format(defaultTimeFormat))
+	buf.AppendString(entry.Time.Format(defaultTimeFormat))
 	buf.AppendByte(' ')
 
 	// level
@@ -112,7 +111,7 @@ func NewFullFormatter() *FullFormatter {
 func (ff *FullFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
 	buf := bufferpool.Borrow()
 	// timestamp
-	buf.AppendString(time.Unix(0, entry.Time).Format(defaultTimeFormat))
+	buf.AppendString(entry.Time.Format(defaultTimeFormat))
 	buf.AppendByte('|')
 
 	// level

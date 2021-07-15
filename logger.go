@@ -271,7 +271,7 @@ func (il *internalLogger) Fatal(msg string) {
 
 func (il *internalLogger) finalize(level core.Level, msg string) (entry *core.LogEntry) {
 	entry = core.NewLogEntry()
-	entry.Time = time.Now().UnixNano()
+	entry.Time = time.Now()
 	entry.Level = level
 	entry.Msg = msg
 	entry.Err = il.err
