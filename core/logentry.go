@@ -5,22 +5,21 @@ import (
 	"encoding/json"
 	"github.com/EdgarTeng/etlog/common/utils"
 	"github.com/EdgarTeng/etlog/opt"
-	"time"
 )
 
 type Fields map[string]interface{}
 
 type LogEntry struct {
-	Time     time.Time `json:"time"`
-	Level    Level     `json:"level"`
-	FileName string    `json:"file"`
-	Line     int       `json:"line"`
-	FuncName string    `json:"func"`
-	Msg      string    `json:"msg"`
-	Marker   string    `json:"marker"`
-	Err      error     `json:"error"`
-	Fields   Fields    `json:"fields"`
-	UseLoc   bool      `json:"-"`
+	Time     int64  `json:"time,omitempty"`
+	Level    Level  `json:"level,omitempty"`
+	SrcFile  string `json:"srcf,omitempty"`
+	Line     int    `json:"line,omitempty"`
+	FuncName string `json:"func,omitempty"`
+	Msg      string `json:"msg,omitempty"`
+	Marker   string `json:"marker,omitempty"`
+	Err      error  `json:"error,omitempty"`
+	Fields   Fields `json:"fields,omitempty"`
+	UseLoc   bool   `json:"-"`
 }
 
 func NewLogEntry() *LogEntry {
@@ -31,7 +30,7 @@ func (le *LogEntry) Copy() *LogEntry {
 	return &LogEntry{
 		Time:     le.Time,
 		Level:    le.Level,
-		FileName: le.FileName,
+		SrcFile:  le.SrcFile,
 		Line:     le.Line,
 		FuncName: le.FuncName,
 		Msg:      le.Msg,

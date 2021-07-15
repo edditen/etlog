@@ -1,9 +1,12 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/EdgarTeng/etlog/common/bufferpool"
+	"github.com/EdgarTeng/etlog/opt"
 	"strings"
+	"time"
 )
 
 type Format int
@@ -16,6 +19,7 @@ const (
 	defaultFormat        = SIMPLE
 	SIMPLE        Format = iota
 	FULL
+	JSON
 )
 
 func NewFormat(format string) Format {
@@ -24,6 +28,8 @@ func NewFormat(format string) Format {
 		return SIMPLE
 	case "FULL":
 		return FULL
+	case "JSON":
+		return JSON
 	}
 	return defaultFormat
 }
@@ -34,6 +40,8 @@ func (f Format) String() string {
 		return "SIMPLE"
 	case FULL:
 		return "FULL"
+	case JSON:
+		return "JSON"
 	}
 	return ""
 }
@@ -51,6 +59,8 @@ func FormatterFactory(format Format) Formatter {
 		return NewSimpleFormatter()
 	case FULL:
 		return NewFullFormatter()
+	case JSON:
+		return NewJSONFormatter()
 	}
 	return NewSimpleFormatter()
 }
@@ -63,7 +73,7 @@ func NewSimpleFormatter() *SimpleFormatter {
 func (sf *SimpleFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
 	buf := bufferpool.Borrow()
 	// timestamp
-	buf.AppendString(entry.Time.Format(defaultTimeFormat))
+	buf.AppendString(time.Unix(0, entry.Time).Format(defaultTimeFormat))
 	buf.AppendByte(' ')
 
 	// level
@@ -92,18 +102,17 @@ func (sf *SimpleFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
 }
 
 type FullFormatter struct {
-	format string
 }
 
 func NewFullFormatter() *FullFormatter {
-	// format: "time|level|line|func|message|error|fields"
+	// format: "time|level|src:line|func|message|error|fields"
 	return &FullFormatter{}
 }
 
 func (ff *FullFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
 	buf := bufferpool.Borrow()
 	// timestamp
-	buf.AppendString(entry.Time.Format(defaultTimeFormat))
+	buf.AppendString(time.Unix(0, entry.Time).Format(defaultTimeFormat))
 	buf.AppendByte('|')
 
 	// level
@@ -112,7 +121,7 @@ func (ff *FullFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
 
 	// line & func
 	if entry.UseLoc {
-		buf.AppendString(entry.FileName)
+		buf.AppendString(entry.SrcFile)
 		buf.AppendByte(':')
 		buf.AppendInt(int64(entry.Line))
 		buf.AppendByte('|')
@@ -140,5 +149,24 @@ func (ff *FullFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
 	}
 	buf.AppendNewLine()
 
+	return buf
+}
+
+type JSONFormatter struct {
+}
+
+func NewJSONFormatter() *JSONFormatter {
+	return &JSONFormatter{}
+}
+
+func (jf *JSONFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
+	buf := bufferpool.Borrow()
+	b, err := json.Marshal(entry)
+	if err != nil {
+		opt.GetErrLog().Printf("JSONFormatter marshal entry error: %+v\n", err)
+		return buf
+	}
+	buf.AppendBytes(b)
+	buf.AppendNewLine()
 	return buf
 }

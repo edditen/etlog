@@ -271,14 +271,14 @@ func (il *internalLogger) Fatal(msg string) {
 
 func (il *internalLogger) finalize(level core.Level, msg string) (entry *core.LogEntry) {
 	entry = core.NewLogEntry()
-	entry.Time = time.Now()
+	entry.Time = time.Now().UnixNano()
 	entry.Level = level
 	entry.Msg = msg
 	entry.Err = il.err
 	entry.Fields = il.fields
 	if fname, line, funcName, ok := utils.ShortSourceLoc(il.etLogger.sourceSkip); ok {
 		entry.UseLoc = true
-		entry.FileName = fname
+		entry.SrcFile = fname
 		entry.Line = line
 		entry.FuncName = funcName
 	}
@@ -349,7 +349,7 @@ func newLogE(entry *core.LogEntry) *opt.LogE {
 	return &opt.LogE{
 		Time:     entry.Time,
 		Level:    entry.Level.String(),
-		FileName: entry.FileName,
+		SrcFile:  entry.SrcFile,
 		Line:     entry.Line,
 		FuncName: entry.FuncName,
 		Marker:   entry.Marker,
