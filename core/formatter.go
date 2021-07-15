@@ -112,7 +112,9 @@ func (ff *FullFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
 
 	// line & func
 	if entry.UseLoc {
-		buf.AppendString(entry.Line)
+		buf.AppendString(entry.FileName)
+		buf.AppendByte(':')
+		buf.AppendInt(int64(entry.Line))
 		buf.AppendByte('|')
 		buf.AppendString(entry.FuncName)
 	} else {

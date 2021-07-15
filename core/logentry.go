@@ -13,7 +13,8 @@ type Fields map[string]interface{}
 type LogEntry struct {
 	Time     time.Time `json:"time"`
 	Level    Level     `json:"level"`
-	Line     string    `json:"line"`
+	FileName string    `json:"file"`
+	Line     int       `json:"line"`
 	FuncName string    `json:"func"`
 	Msg      string    `json:"msg"`
 	Marker   string    `json:"marker"`
@@ -30,6 +31,7 @@ func (le *LogEntry) Copy() *LogEntry {
 	return &LogEntry{
 		Time:     le.Time,
 		Level:    le.Level,
+		FileName: le.FileName,
 		Line:     le.Line,
 		FuncName: le.FuncName,
 		Msg:      le.Msg,
