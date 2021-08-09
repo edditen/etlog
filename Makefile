@@ -5,7 +5,7 @@ clean: ## clean logs
 
 .PHONY: test
 test: ## Test all files with unit mode
-	-@go test ./...
+	-@go test -race ./...
 
 .PHONY: example
 example: ## Run example

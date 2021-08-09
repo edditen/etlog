@@ -3,8 +3,8 @@ package core
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/EdgarTeng/etlog/common/utils"
-	"github.com/EdgarTeng/etlog/opt"
+	"github.com/edditen/etlog/common/utils"
+	"github.com/edditen/etlog/opt"
 	"time"
 )
 

@@ -2,8 +2,8 @@ package handler
 
 import (
 	"fmt"
-	"github.com/EdgarTeng/etlog/config"
-	"github.com/EdgarTeng/etlog/core"
+	"github.com/edditen/etlog/config"
+	"github.com/edditen/etlog/core"
 	"github.com/pkg/errors"
 )
 

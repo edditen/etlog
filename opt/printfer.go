@@ -1,7 +1,7 @@
 package opt
 
 import (
-	"github.com/EdgarTeng/etlog/common/utils"
+	"github.com/edditen/etlog/common/utils"
 	"log"
 	"os"
 )

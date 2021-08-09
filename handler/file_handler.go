@@ -2,10 +2,10 @@ package handler
 
 import (
 	"fmt"
-	"github.com/EdgarTeng/etlog/common/bufferpool"
-	"github.com/EdgarTeng/etlog/handler/archiver"
-	"github.com/EdgarTeng/etlog/handler/cleaner"
-	"github.com/EdgarTeng/etlog/opt"
+	"github.com/edditen/etlog/common/bufferpool"
+	"github.com/edditen/etlog/handler/archiver"
+	"github.com/edditen/etlog/handler/cleaner"
+	"github.com/edditen/etlog/opt"
 	"io/fs"
 	"math"
 	"os"
@@ -14,9 +14,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/EdgarTeng/etlog/common/utils"
-	"github.com/EdgarTeng/etlog/config"
-	"github.com/EdgarTeng/etlog/core"
+	"github.com/edditen/etlog/common/utils"
+	"github.com/edditen/etlog/config"
+	"github.com/edditen/etlog/core"
 	"github.com/pkg/errors"
 )
 

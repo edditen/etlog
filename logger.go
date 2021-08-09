@@ -1,11 +1,11 @@
 package etlog
 
 import (
-	"github.com/EdgarTeng/etlog/common/utils"
-	"github.com/EdgarTeng/etlog/config"
-	"github.com/EdgarTeng/etlog/core"
-	"github.com/EdgarTeng/etlog/handler"
-	"github.com/EdgarTeng/etlog/opt"
+	"github.com/edditen/etlog/common/utils"
+	"github.com/edditen/etlog/config"
+	"github.com/edditen/etlog/core"
+	"github.com/edditen/etlog/handler"
+	"github.com/edditen/etlog/opt"
 	"log"
 	"os"
 	"time"

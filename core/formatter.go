@@ -3,8 +3,8 @@ package core
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/EdgarTeng/etlog/common/bufferpool"
-	"github.com/EdgarTeng/etlog/opt"
+	"github.com/edditen/etlog/common/bufferpool"
+	"github.com/edditen/etlog/opt"
 	"strings"
 )
 
@@ -12,6 +12,7 @@ type Format int
 
 const (
 	defaultTimeFormat = "2006-01-02 15:04:05.000000"
+	simpleTimeFormat  = "2006-01-02 15:04:05"
 )
 
 const (
@@ -72,7 +73,7 @@ func NewSimpleFormatter() *SimpleFormatter {
 func (sf *SimpleFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
 	buf := bufferpool.Borrow()
 	// timestamp
-	buf.AppendString(entry.Time.Format(defaultTimeFormat))
+	buf.AppendString(entry.Time.Format(simpleTimeFormat))
 	buf.AppendByte(' ')
 
 	// level
@@ -86,12 +87,12 @@ func (sf *SimpleFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
 	buf.AppendValue(entry.Msg)
 
 	if entry.Err != nil {
-		buf.AppendString("|err:=")
+		buf.AppendString("\t|err:=")
 		buf.AppendString(fmt.Sprint(entry.Err))
 	}
 
 	if entry.Fields != nil && len(entry.Fields) > 0 {
-		buf.AppendString("|fields:=")
+		buf.AppendString("\t|fields:=")
 		buf.AppendBytes(entry.Fields.Bytes())
 	}
 

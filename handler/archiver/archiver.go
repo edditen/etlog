@@ -1,9 +1,9 @@
 package archiver
 
 import (
-	"github.com/EdgarTeng/etlog/common/queue"
-	"github.com/EdgarTeng/etlog/common/runnable"
-	"github.com/EdgarTeng/etlog/common/utils"
+	"github.com/edditen/etlog/common/queue"
+	"github.com/edditen/etlog/common/runnable"
+	"github.com/edditen/etlog/common/utils"
 	"github.com/pkg/errors"
 	"os"
 	"path"

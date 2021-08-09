@@ -2,7 +2,7 @@ package config
 
 import (
 	"fmt"
-	"github.com/EdgarTeng/etlog/opt"
+	"github.com/edditen/etlog/opt"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"

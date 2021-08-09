@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"github.com/EdgarTeng/etlog/config"
-	"github.com/EdgarTeng/etlog/core"
+	"github.com/edditen/etlog/config"
+	"github.com/edditen/etlog/core"
 	"strings"
 )
 

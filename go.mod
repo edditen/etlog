@@ -1,4 +1,4 @@
-module github.com/EdgarTeng/etlog
+module github.com/edditen/etlog
 
 go 1.16
 

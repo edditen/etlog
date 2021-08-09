@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/EdgarTeng/etlog/core"
-	"github.com/EdgarTeng/etlog/opt"
+	"github.com/edditen/etlog/core"
+	"github.com/edditen/etlog/opt"
 	"log"
 	"sync"
 	"time"
 
-	"github.com/EdgarTeng/etlog"
+	"github.com/edditen/etlog"
 )
 
 func main() {
