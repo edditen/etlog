@@ -83,7 +83,6 @@ func (sf *SimpleFormatter) Format(entry *LogEntry) *bufferpool.Buffer {
 	buf.AppendByte('\t')
 
 	// msg
-	buf.AppendString("|msg:=")
 	buf.AppendValue(entry.Msg)
 
 	if entry.Err != nil {

@@ -18,7 +18,7 @@ func TestSimpleFormatter_Format(t *testing.T) {
 		}
 		got := formatter.Format(meta)
 		t.Log(got)
-		expect := "2021-06-15 12:20:45 [INFO]\t|msg:=hello world\t|err:=oops\t|fields:={\"rootCause\":\"nil pointer\"}\n"
+		expect := "2021-06-15 12:20:45 [INFO]\thello world\t|err:=oops\t|fields:={\"rootCause\":\"nil pointer\"}\n"
 		if got.String() != expect {
 			t.Errorf("got: %s, expected: %s", got, expect)
 		}
